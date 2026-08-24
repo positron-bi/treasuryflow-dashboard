@@ -12,6 +12,7 @@ from treasuryflow_core import (
     APP_VERSION,
     TreasuryFlowError,
     application_home,
+    classify_path,
     find_sources,
     has_changed,
     import_files,
@@ -34,6 +35,10 @@ class TreasuryFlowApp(tk.Tk):
         self.daily_text = tk.StringVar(value="—")
         self.manual_text = tk.StringVar(value="—")
         self.facilities_text = tk.StringVar(value="—")
+        self.selected_files: dict[str, Path] = {}
+        self.selected_daily_text = tk.StringVar(value="فایلی انتخاب نشده")
+        self.selected_manual_text = tk.StringVar(value="فایلی انتخاب نشده")
+        self.selected_facilities_text = tk.StringVar(value="فایلی انتخاب نشده")
 
         self.title(f"TreasuryFlow — گزارش جریان نقد | {APP_VERSION}")
         self.geometry("880x660")
@@ -69,7 +74,7 @@ class TreasuryFlowApp(tk.Tk):
         ttk.Label(shell, text="TreasuryFlow", style="Title.TLabel", anchor="e").pack(fill="x")
         ttk.Label(
             shell,
-            text=f"فایل جدید را در {self.home_dir} قرار دهید یا با دکمه زیر انتخاب کنید؛ داشبورد خودکار به‌روز می‌شود.",
+            text="هر فایل را از بخش مربوط به خودش انتخاب کنید، سپس دکمه بارگذاری را بزنید.",
             style="Sub.TLabel",
             anchor="e",
             wraplength=800,
@@ -82,13 +87,29 @@ class TreasuryFlowApp(tk.Tk):
         cards.pack(fill="x")
         for column in range(3):
             cards.columnconfigure(column, weight=1, uniform="source")
-        self._source_card(cards, 0, "گزارش روزانه خزانه", self.daily_text)
-        self._source_card(cards, 1, "ورودی‌های دستی", self.manual_text)
-        self._source_card(cards, 2, "گزارش تسهیلات", self.facilities_text)
+        self._source_card(cards, 0, "گزارش روزانه خزانه", "daily", self.daily_text, self.selected_daily_text)
+        self._source_card(cards, 1, "ورودی‌های دستی", "manual", self.manual_text, self.selected_manual_text)
+        self._source_card(cards, 2, "گزارش تسهیلات", "facilities", self.facilities_text, self.selected_facilities_text)
+
+        upload = ttk.Frame(shell)
+        upload.pack(fill="x", pady=(18, 5))
+        tk.Button(
+            upload,
+            text="بارگذاری فایل‌های انتخاب‌شده",
+            command=self._upload_selected,
+            background="#16a34a",
+            activebackground="#15803d",
+            foreground="#ffffff",
+            activeforeground="#ffffff",
+            font=("Segoe UI", 11, "bold"),
+            relief="flat",
+            padx=42,
+            pady=10,
+            cursor="hand2",
+        ).pack(anchor="center")
 
         actions = ttk.Frame(shell)
-        actions.pack(fill="x", pady=(18, 8))
-        ttk.Button(actions, text="افزودن فایل جدید", style="Primary.TButton", command=self._choose_files).pack(side="right", padx=(8, 0))
+        actions.pack(fill="x", pady=(8, 8))
         ttk.Button(actions, text="به‌روزرسانی گزارش", style="Secondary.TButton", command=lambda: self._start_process(True)).pack(side="right", padx=8)
         ttk.Button(actions, text="باز کردن داشبورد", style="Secondary.TButton", command=self._open_dashboard).pack(side="right", padx=8)
         ttk.Button(actions, text="باز کردن پوشه", style="Secondary.TButton", command=self._open_folder).pack(side="right", padx=8)
@@ -115,11 +136,22 @@ class TreasuryFlowApp(tk.Tk):
         self.log_box.pack(fill="both", expand=True)
         self.log_box.configure(state="disabled")
 
-    def _source_card(self, parent: ttk.Frame, column: int, title: str, variable: tk.StringVar) -> None:
+    def _source_card(
+        self,
+        parent: ttk.Frame,
+        column: int,
+        title: str,
+        kind: str,
+        current: tk.StringVar,
+        selected: tk.StringVar,
+    ) -> None:
         card = ttk.Frame(parent, style="Card.TFrame", padding=(12, 10))
         card.grid(row=0, column=column, sticky="nsew", padx=(0 if column == 0 else 5, 0 if column == 2 else 5))
         ttk.Label(card, text=title, style="CardTitle.TLabel", anchor="e").pack(fill="x")
-        ttk.Label(card, textvariable=variable, style="CardValue.TLabel", anchor="e", wraplength=230, justify="right").pack(fill="x", pady=(5, 0))
+        ttk.Button(card, text=f"انتخاب {title}", style="Primary.TButton", command=lambda: self._choose_file(kind)).pack(fill="x", pady=(8, 6))
+        ttk.Label(card, textvariable=selected, style="CardValue.TLabel", anchor="center", wraplength=230, justify="center").pack(fill="x")
+        ttk.Label(card, text="فایل فعلی:", style="CardTitle.TLabel", anchor="e").pack(fill="x", pady=(9, 0))
+        ttk.Label(card, textvariable=current, style="CardValue.TLabel", anchor="e", wraplength=230, justify="right").pack(fill="x", pady=(3, 0))
 
     def _append_log(self, message: str) -> None:
         self.log_box.configure(state="normal")
@@ -136,13 +168,41 @@ class TreasuryFlowApp(tk.Tk):
         if state.get("last_success"):
             self.last_run_text.set(f"آخرین گزارش: {state.get('report_date', '—')} | {state['last_success']}")
 
-    def _choose_files(self) -> None:
-        selected = filedialog.askopenfilenames(
+    def _choose_file(self, kind: str) -> None:
+        titles = {
+            "daily": "انتخاب گزارش روزانه خزانه",
+            "manual": "انتخاب فایل ورودی‌های دستی",
+            "facilities": "انتخاب گزارش تسهیلات",
+        }
+        selected = filedialog.askopenfilename(
             parent=self,
-            title="انتخاب فایل‌های ورودی TreasuryFlow",
+            title=titles[kind],
             filetypes=[("Excel", "*.xlsx")],
         )
         if not selected:
+            return
+        path = Path(selected)
+        try:
+            detected = classify_path(path)
+        except Exception as error:
+            messagebox.showerror("TreasuryFlow", str(error))
+            return
+        if detected != kind:
+            detected_title = titles.get(detected, detected).replace("انتخاب ", "")
+            messagebox.showerror("TreasuryFlow", f"فایل انتخاب‌شده مربوط به «{detected_title}» است. لطفاً آن را از بخش درست انتخاب کنید.")
+            return
+        self.selected_files[kind] = path
+        variables = {
+            "daily": self.selected_daily_text,
+            "manual": self.selected_manual_text,
+            "facilities": self.selected_facilities_text,
+        }
+        variables[kind].set(path.name)
+
+    def _upload_selected(self) -> None:
+        selected = list(self.selected_files.values())
+        if not selected:
+            messagebox.showinfo("TreasuryFlow", "ابتدا حداقل یک فایل را از بخش مربوط به آن انتخاب کنید.")
             return
         if self.worker_running:
             messagebox.showinfo("TreasuryFlow", "پردازش قبلی هنوز در حال اجراست.")
@@ -154,6 +214,7 @@ class TreasuryFlowApp(tk.Tk):
             try:
                 imported = import_files(self.home_dir, [Path(item) for item in selected])
                 self.events.put(("log", "فایل‌های دریافت‌شده: " + "، ".join(path.name for path in imported)))
+                self.events.put(("uploaded", None))
                 result = process_sources(self.home_dir, force=True, log=lambda text: self.events.put(("log", text)))
                 self.events.put(("done", result))
             except Exception as error:
@@ -182,6 +243,11 @@ class TreasuryFlowApp(tk.Tk):
                 kind, payload = self.events.get_nowait()
                 if kind == "log":
                     self._append_log(str(payload))
+                elif kind == "uploaded":
+                    self.selected_files.clear()
+                    self.selected_daily_text.set("فایلی انتخاب نشده")
+                    self.selected_manual_text.set("فایلی انتخاب نشده")
+                    self.selected_facilities_text.set("فایلی انتخاب نشده")
                 elif kind == "done":
                     self.worker_running = False
                     self._refresh_sources()
