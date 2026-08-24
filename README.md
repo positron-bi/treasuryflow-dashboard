@@ -1,5 +1,7 @@
 # TreasuryFlow Dashboard
 
+مسیر کد فعال این است: `%USERPROFILE%\Desktop\خرانه پیشبینی\treasuryflow-dashboard`.
+
 اپ ویندوزی به‌روزرسانی خودکار گزارش جریان نقد پوزیترون. برنامه برای استقرار در
 `X:\Accounting\report flow` طراحی شده و همه ورودی‌ها و خروجی‌های عملیاتی را در همان پوشه نگه می‌دارد.
 

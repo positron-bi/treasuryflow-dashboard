@@ -59,8 +59,8 @@ namespace Positron.TreasuryFlow
                 };
                 startInfo.EnvironmentVariables["TREASURYFLOW_HOME"] = sharedHome;
                 startInfo.EnvironmentVariables["TREASURYFLOW_PUBLISH_REPO"] = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "New project",
+                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                    "خرانه پیشبینی",
                     "treasuryflow-dashboard"
                 );
                 Process.Start(startInfo);

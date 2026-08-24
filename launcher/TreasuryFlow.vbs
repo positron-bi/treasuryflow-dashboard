@@ -43,7 +43,7 @@ If NeedsUpdate(sourceRuntime, localRuntime) Then
 End If
 
 shell.Environment("PROCESS")("TREASURYFLOW_HOME") = sharedHome
-shell.Environment("PROCESS")("TREASURYFLOW_PUBLISH_REPO") = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Documents\New project"), "treasuryflow-dashboard")
+shell.Environment("PROCESS")("TREASURYFLOW_PUBLISH_REPO") = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Desktop\خرانه پیشبینی"), "treasuryflow-dashboard")
 runCommand = Chr(34) & localRuntime & Chr(34)
 If autoMode Then
     shell.Run runCommand & " --once", 0, True
