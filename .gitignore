@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.test-*/
+.exe-test/
+.launcher-test/
+build/
+dist/
+*.spec.bak
+
+# داده‌های مالی و خروجی‌های محلی هرگز وارد Git نشوند.
+*.xlsx
+*.xls
+*.html
+*.json
+*.log
+*.pending
+snapshots/
+.treasuryflow/
+_last_processed_signature.txt

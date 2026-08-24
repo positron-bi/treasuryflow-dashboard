@@ -1,0 +1,230 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import queue
+import threading
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+import webbrowser
+
+from treasuryflow_core import (
+    APP_VERSION,
+    TreasuryFlowError,
+    application_home,
+    find_sources,
+    has_changed,
+    import_files,
+    load_state,
+    process_sources,
+)
+
+
+class TreasuryFlowApp(tk.Tk):
+    POLL_MS = 5000
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.home_dir = application_home()
+        self.events: queue.Queue[tuple[str, object]] = queue.Queue()
+        self.worker_running = False
+        self.auto_enabled = tk.BooleanVar(value=True)
+        self.status_text = tk.StringVar(value="در حال بررسی پوشه…")
+        self.last_run_text = tk.StringVar(value="هنوز گزارشی ساخته نشده است")
+        self.daily_text = tk.StringVar(value="—")
+        self.manual_text = tk.StringVar(value="—")
+        self.facilities_text = tk.StringVar(value="—")
+
+        self.title(f"TreasuryFlow — گزارش جریان نقد | {APP_VERSION}")
+        self.geometry("880x660")
+        self.minsize(760, 590)
+        self.configure(background="#f4f7fb")
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self._build_style()
+        self._build_ui()
+        self._refresh_sources()
+        self.after(150, self._drain_events)
+        self.after(800, self._auto_check)
+
+    def _build_style(self) -> None:
+        style = ttk.Style(self)
+        try:
+            style.theme_use("vista")
+        except tk.TclError:
+            pass
+        style.configure("Title.TLabel", background="#f4f7fb", foreground="#123252", font=("Segoe UI", 20, "bold"))
+        style.configure("Sub.TLabel", background="#f4f7fb", foreground="#5d7083", font=("Segoe UI", 10))
+        style.configure("Card.TFrame", background="#ffffff", relief="solid", borderwidth=1)
+        style.configure("CardTitle.TLabel", background="#ffffff", foreground="#526579", font=("Segoe UI", 9))
+        style.configure("CardValue.TLabel", background="#ffffff", foreground="#152b42", font=("Segoe UI", 10, "bold"))
+        style.configure("Status.TLabel", background="#eaf7ef", foreground="#17663a", font=("Segoe UI", 11, "bold"), padding=10)
+        style.configure("Primary.TButton", font=("Segoe UI", 10, "bold"), padding=(16, 10))
+        style.configure("Secondary.TButton", font=("Segoe UI", 10), padding=(12, 9))
+        style.configure("TCheckbutton", background="#f4f7fb", font=("Segoe UI", 10))
+
+    def _build_ui(self) -> None:
+        shell = ttk.Frame(self, padding=(28, 22, 28, 20))
+        shell.pack(fill="both", expand=True)
+
+        ttk.Label(shell, text="TreasuryFlow", style="Title.TLabel", anchor="e").pack(fill="x")
+        ttk.Label(
+            shell,
+            text=f"فایل جدید را در {self.home_dir} قرار دهید یا با دکمه زیر انتخاب کنید؛ داشبورد خودکار به‌روز می‌شود.",
+            style="Sub.TLabel",
+            anchor="e",
+            wraplength=800,
+            justify="right",
+        ).pack(fill="x", pady=(3, 16))
+
+        ttk.Label(shell, textvariable=self.status_text, style="Status.TLabel", anchor="e").pack(fill="x", pady=(0, 14))
+
+        cards = ttk.Frame(shell)
+        cards.pack(fill="x")
+        for column in range(3):
+            cards.columnconfigure(column, weight=1, uniform="source")
+        self._source_card(cards, 0, "گزارش روزانه خزانه", self.daily_text)
+        self._source_card(cards, 1, "ورودی‌های دستی", self.manual_text)
+        self._source_card(cards, 2, "گزارش تسهیلات", self.facilities_text)
+
+        actions = ttk.Frame(shell)
+        actions.pack(fill="x", pady=(18, 8))
+        ttk.Button(actions, text="افزودن فایل جدید", style="Primary.TButton", command=self._choose_files).pack(side="right", padx=(8, 0))
+        ttk.Button(actions, text="به‌روزرسانی گزارش", style="Secondary.TButton", command=lambda: self._start_process(True)).pack(side="right", padx=8)
+        ttk.Button(actions, text="باز کردن داشبورد", style="Secondary.TButton", command=self._open_dashboard).pack(side="right", padx=8)
+        ttk.Button(actions, text="باز کردن پوشه", style="Secondary.TButton", command=self._open_folder).pack(side="right", padx=8)
+
+        options = ttk.Frame(shell)
+        options.pack(fill="x", pady=(5, 10))
+        ttk.Checkbutton(options, text="بررسی خودکار فایل جدید هر ۵ ثانیه", variable=self.auto_enabled).pack(side="right")
+        ttk.Label(options, textvariable=self.last_run_text, style="Sub.TLabel").pack(side="left")
+
+        log_card = ttk.Frame(shell, style="Card.TFrame", padding=10)
+        log_card.pack(fill="both", expand=True, pady=(4, 0))
+        ttk.Label(log_card, text="رویدادهای برنامه", style="CardValue.TLabel", anchor="e").pack(fill="x", pady=(0, 6))
+        self.log_box = tk.Text(
+            log_card,
+            height=12,
+            wrap="word",
+            background="#f9fbfd",
+            foreground="#26394d",
+            relief="flat",
+            font=("Segoe UI", 9),
+            padx=10,
+            pady=8,
+        )
+        self.log_box.pack(fill="both", expand=True)
+        self.log_box.configure(state="disabled")
+
+    def _source_card(self, parent: ttk.Frame, column: int, title: str, variable: tk.StringVar) -> None:
+        card = ttk.Frame(parent, style="Card.TFrame", padding=(12, 10))
+        card.grid(row=0, column=column, sticky="nsew", padx=(0 if column == 0 else 5, 0 if column == 2 else 5))
+        ttk.Label(card, text=title, style="CardTitle.TLabel", anchor="e").pack(fill="x")
+        ttk.Label(card, textvariable=variable, style="CardValue.TLabel", anchor="e", wraplength=230, justify="right").pack(fill="x", pady=(5, 0))
+
+    def _append_log(self, message: str) -> None:
+        self.log_box.configure(state="normal")
+        self.log_box.insert("end", message.rstrip() + "\n")
+        self.log_box.see("end")
+        self.log_box.configure(state="disabled")
+
+    def _refresh_sources(self) -> None:
+        sources = find_sources(self.home_dir)
+        self.daily_text.set(sources.daily.name if sources.daily else "پیدا نشد")
+        self.manual_text.set(sources.manual.name if sources.manual else "اختیاری — پیدا نشد")
+        self.facilities_text.set(sources.facilities.name if sources.facilities else "اختیاری — پیدا نشد")
+        state = load_state(self.home_dir)
+        if state.get("last_success"):
+            self.last_run_text.set(f"آخرین گزارش: {state.get('report_date', '—')} | {state['last_success']}")
+
+    def _choose_files(self) -> None:
+        selected = filedialog.askopenfilenames(
+            parent=self,
+            title="انتخاب فایل‌های ورودی TreasuryFlow",
+            filetypes=[("Excel", "*.xlsx")],
+        )
+        if not selected:
+            return
+        if self.worker_running:
+            messagebox.showinfo("TreasuryFlow", "پردازش قبلی هنوز در حال اجراست.")
+            return
+        self.worker_running = True
+        self.status_text.set("در حال دریافت و شناسایی فایل‌ها…")
+
+        def worker() -> None:
+            try:
+                imported = import_files(self.home_dir, [Path(item) for item in selected])
+                self.events.put(("log", "فایل‌های دریافت‌شده: " + "، ".join(path.name for path in imported)))
+                result = process_sources(self.home_dir, force=True, log=lambda text: self.events.put(("log", text)))
+                self.events.put(("done", result))
+            except Exception as error:
+                self.events.put(("error", error))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_process(self, force: bool = False) -> None:
+        if self.worker_running:
+            return
+        self.worker_running = True
+        self.status_text.set("در حال ساخت داشبورد جدید…")
+
+        def worker() -> None:
+            try:
+                result = process_sources(self.home_dir, force=force, log=lambda text: self.events.put(("log", text)))
+                self.events.put(("done", result))
+            except Exception as error:
+                self.events.put(("error", error))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _drain_events(self) -> None:
+        try:
+            while True:
+                kind, payload = self.events.get_nowait()
+                if kind == "log":
+                    self._append_log(str(payload))
+                elif kind == "done":
+                    self.worker_running = False
+                    self._refresh_sources()
+                    if payload is None:
+                        self.status_text.set("داشبورد با فایل‌های فعلی به‌روز است.")
+                    else:
+                        self.status_text.set(f"گزارش {payload.report_date} با موفقیت آماده شد.")
+                elif kind == "error":
+                    self.worker_running = False
+                    error = payload
+                    friendly = str(error) if isinstance(error, TreasuryFlowError) else f"خطای غیرمنتظره: {error}"
+                    self.status_text.set("ساخت گزارش ناموفق بود؛ جزئیات را بررسی کنید.")
+                    self._append_log(friendly)
+                    messagebox.showerror("TreasuryFlow", friendly)
+        except queue.Empty:
+            pass
+        self.after(150, self._drain_events)
+
+    def _auto_check(self) -> None:
+        if self.auto_enabled.get() and not self.worker_running:
+            try:
+                self._refresh_sources()
+                if has_changed(self.home_dir):
+                    self._append_log("تغییر در فایل‌های ورودی تشخیص داده شد.")
+                    self._start_process(False)
+                elif find_sources(self.home_dir).daily:
+                    self.status_text.set("پوشه زیر نظر است؛ فایل جدید خودکار پردازش می‌شود.")
+                else:
+                    self.status_text.set("منتظر فایل گزارش روزانه خزانه…")
+            except Exception as error:
+                self._append_log(f"بررسی خودکار: {error}")
+        self.after(self.POLL_MS, self._auto_check)
+
+    def _open_dashboard(self) -> None:
+        target = self.home_dir / "index.html"
+        if not target.exists():
+            messagebox.showinfo("TreasuryFlow", "هنوز داشبوردی ساخته نشده است.")
+            return
+        webbrowser.open(target.as_uri())
+
+    def _open_folder(self) -> None:
+        os.startfile(self.home_dir)  # type: ignore[attr-defined]
+
+
+if __name__ == "__main__":
+    TreasuryFlowApp().mainloop()
