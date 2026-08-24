@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import runpy
 import shutil
+import subprocess
 import sys
 import time
 from typing import Callable, Iterable
@@ -26,6 +27,7 @@ LOG_FILE = "treasuryflow.log"
 ACCESS_FILE_ENV = "TREASURYFLOW_ACCESS_FILE"
 ACCESS_DASHBOARD = "treasury"
 ACCESS_TITLE = "داشبورد جریان نقد پوزیترون"
+PUBLISH_REPO_ENV = "TREASURYFLOW_PUBLISH_REPO"
 
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
 ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
@@ -289,6 +291,45 @@ def _protect_html(html: str, users_path: Path) -> str:
         raise TreasuryFlowError(str(exc)) from exc
 
 
+def _run_git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=120,
+    )
+    if result.returncode:
+        raise RuntimeError((result.stderr or result.stdout).strip())
+    return result.stdout.strip()
+
+
+def publish_dashboard(index_path: Path, log: Callable[[str], None] | None = None) -> bool:
+    configured = os.environ.get(PUBLISH_REPO_ENV, "").strip()
+    if not configured:
+        return False
+    repo = Path(configured).expanduser().resolve()
+    if not (repo / ".git").is_dir():
+        raise TreasuryFlowError(f"پوشه انتشار GitHub معتبر نیست: {repo}")
+    target = repo / "index.html"
+    pending = repo / "index.html.pending"
+    shutil.copy2(index_path, pending)
+    os.replace(pending, target)
+    _run_git(repo, "add", "-f", "--", "index.html")
+    changed = subprocess.run(
+        ["git", "-C", str(repo), "diff", "--cached", "--quiet", "--", "index.html"],
+        timeout=30,
+    ).returncode != 0
+    if not changed:
+        return False
+    _run_git(repo, "commit", "--only", "-m", "publish protected TreasuryFlow dashboard", "--", "index.html")
+    _run_git(repo, "push", "origin", "HEAD:main")
+    if log:
+        log("نسخه رمزگذاری‌شده داشبورد روی GitHub Pages منتشر شد.")
+    return True
+
+
 def process_sources(
     home: Path,
     sources: SourceSet | None = None,
@@ -395,6 +436,10 @@ def process_sources(
         sources=sources,
     )
     save_state(home, result)
+    try:
+        publish_dashboard(index_path, emit)
+    except Exception as exc:
+        emit(f"هشدار انتشار GitHub Pages: {exc}")
     emit(f"گزارش با موفقیت ساخته شد: {report_path.name}")
     return result
 

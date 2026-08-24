@@ -39,6 +39,7 @@ If NeedsUpdate(sourceRuntime, localRuntime) Then
 End If
 
 shell.Environment("PROCESS")("TREASURYFLOW_HOME") = sharedHome
+shell.Environment("PROCESS")("TREASURYFLOW_PUBLISH_REPO") = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Documents\New project"), "treasuryflow-dashboard")
 shell.Run Chr(34) & localRuntime & Chr(34), 1, False
 If Err.Number <> 0 Then
     shell.Popup "اجرای TreasuryFlow ناموفق بود:" & vbCrLf & Err.Description, 0, "TreasuryFlow", 16

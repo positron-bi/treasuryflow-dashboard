@@ -58,6 +58,11 @@ namespace Positron.TreasuryFlow
                     UseShellExecute = false,
                 };
                 startInfo.EnvironmentVariables["TREASURYFLOW_HOME"] = sharedHome;
+                startInfo.EnvironmentVariables["TREASURYFLOW_PUBLISH_REPO"] = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "New project",
+                    "treasuryflow-dashboard"
+                );
                 Process.Start(startInfo);
             }
             catch (Exception error)
