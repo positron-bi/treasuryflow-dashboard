@@ -13,7 +13,7 @@ namespace Positron.TreasuryFlow
             try
             {
                 string sharedHome = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-                string sourceRuntime = Path.Combine(sharedHome, "TreasuryFlow.runtime.exe");
+                string sourceRuntime = Path.Combine(sharedHome, "TreasuryFlow.runtime.v2.exe");
                 if (!File.Exists(sourceRuntime))
                 {
                     throw new FileNotFoundException("فایل هسته برنامه کنار راه‌انداز پیدا نشد.", sourceRuntime);
@@ -25,7 +25,7 @@ namespace Positron.TreasuryFlow
                     "TreasuryFlow"
                 );
                 Directory.CreateDirectory(localDir);
-                string localRuntime = Path.Combine(localDir, "TreasuryFlow.runtime.exe");
+                string localRuntime = Path.Combine(localDir, "TreasuryFlow.runtime.v2.exe");
 
                 FileInfo sourceInfo = new FileInfo(sourceRuntime);
                 bool needsCopy = !File.Exists(localRuntime);

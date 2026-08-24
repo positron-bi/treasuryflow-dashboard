@@ -42,7 +42,7 @@ python app.pyw
 .\build_app.ps1
 ```
 
-برای اجرای محلی، دو فایل `dist\TreasuryFlow.exe` و `dist\TreasuryFlow.runtime.exe` باید کنار هم باشند. در استقرار شبکه، `TreasuryFlow.runtime.exe` همراه `launcher\TreasuryFlow.vbs` و یک میانبر ویندوز استفاده می‌شود.
+برای اجرای محلی، دو فایل `dist\TreasuryFlow.exe` و `dist\TreasuryFlow.runtime.exe` باید کنار هم باشند. در استقرار شبکه، نسخه اجرایی با نام `TreasuryFlow.runtime.v2.exe` همراه `launcher\TreasuryFlow.vbs` و یک میانبر ویندوز استفاده می‌شود.
 
 ## کنترل کیفیت
 

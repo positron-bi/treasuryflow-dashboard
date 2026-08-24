@@ -6,9 +6,9 @@ Set shell = CreateObject("WScript.Shell")
 
 On Error Resume Next
 sharedHome = fso.GetParentFolderName(WScript.ScriptFullName)
-sourceRuntime = fso.BuildPath(sharedHome, "TreasuryFlow.runtime.exe")
+sourceRuntime = fso.BuildPath(sharedHome, "TreasuryFlow.runtime.v2.exe")
 If Not fso.FileExists(sourceRuntime) Then
-    shell.Popup "فایل TreasuryFlow.runtime.exe در پوشه برنامه پیدا نشد.", 0, "TreasuryFlow", 16
+    shell.Popup "فایل TreasuryFlow.runtime.v2.exe در پوشه برنامه پیدا نشد.", 0, "TreasuryFlow", 16
     WScript.Quit 1
 End If
 
@@ -21,7 +21,7 @@ If Err.Number <> 0 Then
     WScript.Quit 1
 End If
 
-localRuntime = fso.BuildPath(localDir, "TreasuryFlow.runtime.exe")
+localRuntime = fso.BuildPath(localDir, "TreasuryFlow.runtime.v2.exe")
 If NeedsUpdate(sourceRuntime, localRuntime) Then
     pending = localRuntime & ".pending"
     If fso.FileExists(pending) Then fso.DeleteFile pending, True
