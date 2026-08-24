@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
@@ -8,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from dashboard_auth import protect_html
+from pipeline.make_html_v2 import build_html
 
 from treasuryflow_core import (
     SourceSet,
@@ -18,6 +20,17 @@ from treasuryflow_core import (
 
 
 class TreasuryFlowCoreTests(unittest.TestCase):
+    def test_html_builder_adds_generation_timestamp(self) -> None:
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            data = root / "data.json"
+            output = root / "dashboard.html"
+            data.write_text(json.dumps({"report_date": "1405/05/28"}), encoding="utf-8")
+            build_html(data, output)
+            html = output.read_text(encoding="utf-8")
+            self.assertIn('"generated_at":', html)
+            self.assertIn('id="updatedBadge"', html)
+
     def test_protected_html_hides_plain_content_and_password(self) -> None:
         with patch("dashboard_auth.load_users", return_value=[{"username": "TestUser", "password": "Secret123"}]):
             protected = protect_html("<h1>financial dashboard</h1>", "unused.xlsx")

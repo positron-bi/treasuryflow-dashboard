@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 import sys
 
@@ -20,6 +21,7 @@ def build_html(data_json: os.PathLike[str] | str, output_html: os.PathLike[str] 
     output_path = Path(output_html)
     with data_path.open(encoding="utf-8") as handle:
         data = json.load(handle)
+    data["generated_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
 
     data_json_text = json.dumps(data, ensure_ascii=False)
     if "</script" in data_json_text.lower():
