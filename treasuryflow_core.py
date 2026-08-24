@@ -23,6 +23,9 @@ DEFAULT_HORIZON = "1406/03/31"
 STATE_FILE = ".treasuryflow_state.json"
 SIGNATURE_FILE = "_last_processed_signature.txt"
 LOG_FILE = "treasuryflow.log"
+ACCESS_FILE_ENV = "TREASURYFLOW_ACCESS_FILE"
+ACCESS_DASHBOARD = "treasury"
+ACCESS_TITLE = "داشبورد جریان نقد پوزیترون"
 
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
 ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
@@ -65,6 +68,13 @@ def application_home() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
+
+
+def access_file() -> Path:
+    configured = os.environ.get(ACCESS_FILE_ENV)
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return Path.home() / "Desktop" / "DashboardAccess" / "dashboard_users.xlsx"
 
 
 def normalize_text(value: object) -> str:
@@ -189,7 +199,7 @@ def file_digest(path: Path) -> str:
     return digest.hexdigest()[:20]
 
 
-def source_signature(sources: SourceSet) -> str:
+def source_signature(sources: SourceSet, users_path: Path | None = None) -> str:
     parts: list[str] = []
     for key, path in (("D", sources.daily), ("M", sources.manual), ("F", sources.facilities)):
         if path:
@@ -197,6 +207,13 @@ def source_signature(sources: SourceSet) -> str:
             parts.append(f"{key}:{path.name}:{stat.st_size}:{stat.st_mtime_ns}:{file_digest(path)}")
         else:
             parts.append(f"{key}:-")
+    if users_path:
+        users_path = Path(users_path)
+        if users_path.exists():
+            stat = users_path.stat()
+            parts.append(f"A:{users_path.name}:{stat.st_size}:{stat.st_mtime_ns}:{file_digest(users_path)}")
+        else:
+            parts.append(f"A:{users_path}:-")
     return "|".join(parts)
 
 
@@ -251,7 +268,7 @@ def has_changed(home: Path, sources: SourceSet | None = None) -> bool:
     sources = sources or find_sources(home)
     if not sources.daily:
         return False
-    return load_state(home).get("signature") != source_signature(sources)
+    return load_state(home).get("signature") != source_signature(sources, access_file())
 
 
 def _load_html_builder():
@@ -262,6 +279,14 @@ def _load_html_builder():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.build_html
+
+
+def _protect_html(html: str, users_path: Path) -> str:
+    try:
+        from dashboard_auth import protect_html
+        return protect_html(html, users_path, ACCESS_DASHBOARD, ACCESS_TITLE)
+    except (FileNotFoundError, ValueError) as exc:
+        raise TreasuryFlowError(str(exc)) from exc
 
 
 def process_sources(
@@ -280,11 +305,14 @@ def process_sources(
     if not sources.daily:
         raise TreasuryFlowError("فایل گزارش روزانه خزانه در پوشه پیدا نشد.")
 
-    signature = source_signature(sources)
+    users_path = access_file()
+    if not users_path.exists():
+        raise TreasuryFlowError(f"فایل کاربران پیدا نشد: {users_path}")
+    signature = source_signature(sources, users_path)
     if not force and load_state(home).get("signature") == signature:
         return None
 
-    wait_until_stable(sources.existing())
+    wait_until_stable([*sources.existing(), users_path])
     report_date = detect_report_date(sources.daily, password)
     if report_date > horizon_end:
         raise TreasuryFlowError(
@@ -347,12 +375,15 @@ def process_sources(
 
     report_flat = report_date.replace("/", "-")
     report_path = home / f"Positron_TMS_v2_{report_flat}.html"
-    _load_html_builder()(pending_data, report_path)
+    plain_path = work_dir / "dashboard.pending.html"
+    plain_path.unlink(missing_ok=True)
+    _load_html_builder()(pending_data, plain_path)
+    protected_html = _protect_html(plain_path.read_text(encoding="utf-8"), users_path)
+    plain_path.unlink(missing_ok=True)
+    _atomic_text(report_path, protected_html)
 
     index_path = home / "index.html"
-    pending_index = index_path.with_name(index_path.name + ".pending")
-    shutil.copy2(report_path, pending_index)
-    os.replace(pending_index, index_path)
+    _atomic_text(index_path, protected_html)
     os.replace(pending_data, final_data)
 
     result = ProcessResult(

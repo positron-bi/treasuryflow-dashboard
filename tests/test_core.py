@@ -5,6 +5,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 import unittest
+from unittest.mock import patch
+
+from dashboard_auth import protect_html
 
 from treasuryflow_core import (
     SourceSet,
@@ -15,6 +18,13 @@ from treasuryflow_core import (
 
 
 class TreasuryFlowCoreTests(unittest.TestCase):
+    def test_protected_html_hides_plain_content_and_password(self) -> None:
+        with patch("dashboard_auth.load_users", return_value=[{"username": "TestUser", "password": "Secret123"}]):
+            protected = protect_html("<h1>financial dashboard</h1>", "unused.xlsx")
+        self.assertIn("const CFG=", protected)
+        self.assertNotIn("financial dashboard", protected)
+        self.assertNotIn("Secret123", protected)
+
     def test_normalize_solar_date(self) -> None:
         self.assertEqual(normalize_date("گزارش ۱۴۰۵-۵-۲۸"), "1405/05/28")
         self.assertEqual(normalize_date("1405/05/28"), "1405/05/28")
