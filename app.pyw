@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import queue
+import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -18,7 +19,19 @@ from treasuryflow_core import (
     import_files,
     load_state,
     process_sources,
+    log_message,
 )
+
+
+def run_once_in_background() -> int:
+    home = application_home()
+    try:
+        if has_changed(home):
+            process_sources(home, force=False)
+        return 0
+    except Exception as error:
+        log_message(home, f"بررسی پس‌زمینه ناموفق بود: {error}")
+        return 1
 
 
 class TreasuryFlowApp(tk.Tk):
@@ -293,4 +306,6 @@ class TreasuryFlowApp(tk.Tk):
 
 
 if __name__ == "__main__":
+    if "--once" in sys.argv:
+        raise SystemExit(run_once_in_background())
     TreasuryFlowApp().mainloop()

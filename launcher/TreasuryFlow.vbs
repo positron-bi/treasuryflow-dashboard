@@ -1,8 +1,12 @@
 Option Explicit
 
-Dim fso, shell, sharedHome, sourceRuntime, localRoot, localDir, localRuntime, pending
+Dim fso, shell, sharedHome, sourceRuntime, localRoot, localDir, localRuntime, pending, autoMode, runCommand
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
+autoMode = False
+If WScript.Arguments.Count > 0 Then
+    autoMode = (LCase(WScript.Arguments(0)) = "/auto")
+End If
 
 On Error Resume Next
 sharedHome = fso.GetParentFolderName(WScript.ScriptFullName)
@@ -40,7 +44,12 @@ End If
 
 shell.Environment("PROCESS")("TREASURYFLOW_HOME") = sharedHome
 shell.Environment("PROCESS")("TREASURYFLOW_PUBLISH_REPO") = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Documents\New project"), "treasuryflow-dashboard")
-shell.Run Chr(34) & localRuntime & Chr(34), 1, False
+runCommand = Chr(34) & localRuntime & Chr(34)
+If autoMode Then
+    shell.Run runCommand & " --once", 0, True
+Else
+    shell.Run runCommand, 1, False
+End If
 If Err.Number <> 0 Then
     shell.Popup "اجرای TreasuryFlow ناموفق بود:" & vbCrLf & Err.Description, 0, "TreasuryFlow", 16
     WScript.Quit 1
