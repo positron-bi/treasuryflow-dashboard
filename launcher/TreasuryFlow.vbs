@@ -1,6 +1,6 @@
 Option Explicit
 
-Dim fso, shell, sharedHome, sourceRuntime, localRoot, localDir, localRuntime, pending, autoMode, runCommand
+Dim fso, shell, sharedHome, sourceRuntime, localRoot, localDir, localRuntime, pending, autoMode, runCommand, localAccess, sharedAccess, publishRepo
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
 autoMode = False
@@ -43,7 +43,20 @@ If NeedsUpdate(sourceRuntime, localRuntime) Then
 End If
 
 shell.Environment("PROCESS")("TREASURYFLOW_HOME") = sharedHome
-shell.Environment("PROCESS")("TREASURYFLOW_PUBLISH_REPO") = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Desktop\خرانه پیشبینی"), "treasuryflow-dashboard")
+localAccess = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Desktop\DashboardAccess"), "dashboard_users.xlsx")
+sharedAccess = fso.BuildPath(fso.BuildPath(sharedHome, ".dashboard_access"), "dashboard_users.xlsx")
+If Not fso.FolderExists(fso.GetParentFolderName(sharedAccess)) Then fso.CreateFolder fso.GetParentFolderName(sharedAccess)
+If fso.FileExists(localAccess) Then
+    If NeedsUpdate(localAccess, sharedAccess) Then fso.CopyFile localAccess, sharedAccess, True
+    shell.Environment("PROCESS")("TREASURYFLOW_ACCESS_FILE") = localAccess
+ElseIf fso.FileExists(sharedAccess) Then
+    shell.Environment("PROCESS")("TREASURYFLOW_ACCESS_FILE") = sharedAccess
+Else
+    shell.Popup "فایل مشترک کاربران داشبورد پیدا نشد.", 0, "TreasuryFlow", 16
+    WScript.Quit 1
+End If
+publishRepo = fso.BuildPath(fso.BuildPath(shell.ExpandEnvironmentStrings("%USERPROFILE%"), "Desktop\خرانه پیشبینی"), "treasuryflow-dashboard")
+If fso.FolderExists(publishRepo) Then shell.Environment("PROCESS")("TREASURYFLOW_PUBLISH_REPO") = publishRepo
 runCommand = Chr(34) & localRuntime & Chr(34)
 If autoMode Then
     shell.Run runCommand & " --once", 0, True

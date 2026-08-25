@@ -58,11 +58,36 @@ namespace Positron.TreasuryFlow
                     UseShellExecute = false,
                 };
                 startInfo.EnvironmentVariables["TREASURYFLOW_HOME"] = sharedHome;
-                startInfo.EnvironmentVariables["TREASURYFLOW_PUBLISH_REPO"] = Path.Combine(
+                string localAccess = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                    "DashboardAccess",
+                    "dashboard_users.xlsx"
+                );
+                string sharedAccessDir = Path.Combine(sharedHome, ".dashboard_access");
+                Directory.CreateDirectory(sharedAccessDir);
+                string sharedAccess = Path.Combine(sharedAccessDir, "dashboard_users.xlsx");
+                if (File.Exists(localAccess))
+                {
+                    File.Copy(localAccess, sharedAccess, true);
+                    startInfo.EnvironmentVariables["TREASURYFLOW_ACCESS_FILE"] = localAccess;
+                }
+                else if (File.Exists(sharedAccess))
+                {
+                    startInfo.EnvironmentVariables["TREASURYFLOW_ACCESS_FILE"] = sharedAccess;
+                }
+                else
+                {
+                    throw new FileNotFoundException("فایل مشترک کاربران داشبورد پیدا نشد.", sharedAccess);
+                }
+                string publishRepo = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
                     "خرانه پیشبینی",
                     "treasuryflow-dashboard"
                 );
+                if (Directory.Exists(publishRepo))
+                {
+                    startInfo.EnvironmentVariables["TREASURYFLOW_PUBLISH_REPO"] = publishRepo;
+                }
                 Process.Start(startInfo);
             }
             catch (Exception error)
