@@ -16,10 +16,12 @@ from treasuryflow_core import (
     classify_path,
     find_sources,
     has_changed,
+    has_upload_request,
     import_files,
     load_state,
     process_sources,
     log_message,
+    mark_upload_request,
 )
 
 
@@ -42,7 +44,7 @@ class TreasuryFlowApp(tk.Tk):
         self.home_dir = application_home()
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.worker_running = False
-        self.processor_enabled = bool(os.environ.get("TREASURYFLOW_PUBLISH_REPO", "").strip())
+        self.processor_enabled = os.environ.get("TREASURYFLOW_ROLE", "uploader").strip().lower() == "processor"
         self.auto_enabled = tk.BooleanVar(value=self.processor_enabled)
         self.status_text = tk.StringVar(value="در حال بررسی پوشه…")
         self.last_run_text = tk.StringVar(value="هنوز گزارشی ساخته نشده است")
@@ -122,21 +124,21 @@ class TreasuryFlowApp(tk.Tk):
             cursor="hand2",
         ).pack(anchor="center")
 
-        actions = ttk.Frame(shell)
-        actions.pack(fill="x", pady=(8, 8))
-        ttk.Button(actions, text="به‌روزرسانی گزارش", style="Secondary.TButton", command=lambda: self._start_process(True)).pack(side="right", padx=8)
-        ttk.Button(actions, text="باز کردن داشبورد", style="Secondary.TButton", command=self._open_dashboard).pack(side="right", padx=8)
-        ttk.Button(actions, text="باز کردن پوشه", style="Secondary.TButton", command=self._open_folder).pack(side="right", padx=8)
+        if self.processor_enabled:
+            actions = ttk.Frame(shell)
+            actions.pack(fill="x", pady=(8, 8))
+            ttk.Button(actions, text="به‌روزرسانی گزارش", style="Secondary.TButton", command=lambda: self._start_process(True)).pack(side="right", padx=8)
+            ttk.Button(actions, text="باز کردن داشبورد", style="Secondary.TButton", command=self._open_dashboard).pack(side="right", padx=8)
+            ttk.Button(actions, text="باز کردن پوشه", style="Secondary.TButton", command=self._open_folder).pack(side="right", padx=8)
 
-        options = ttk.Frame(shell)
-        options.pack(fill="x", pady=(5, 10))
-        ttk.Checkbutton(
-            options,
-            text="تشخیص فوری فایل جدید روی سیستم اصلی",
-            variable=self.auto_enabled,
-            state="normal" if self.processor_enabled else "disabled",
-        ).pack(side="right")
-        ttk.Label(options, textvariable=self.last_run_text, style="Sub.TLabel").pack(side="left")
+            options = ttk.Frame(shell)
+            options.pack(fill="x", pady=(5, 10))
+            ttk.Checkbutton(
+                options,
+                text="تشخیص فوری فایل جدید روی سیستم اصلی",
+                variable=self.auto_enabled,
+            ).pack(side="right")
+            ttk.Label(options, textvariable=self.last_run_text, style="Sub.TLabel").pack(side="left")
 
         log_card = ttk.Frame(shell, style="Card.TFrame", padding=10)
         log_card.pack(fill="both", expand=True, pady=(4, 0))
@@ -232,6 +234,7 @@ class TreasuryFlowApp(tk.Tk):
         def worker() -> None:
             try:
                 imported = import_files(self.home_dir, [Path(item) for item in selected])
+                mark_upload_request(self.home_dir, imported)
                 self.events.put(("log", "فایل‌های دریافت‌شده: " + "، ".join(path.name for path in imported)))
                 self.events.put(("uploaded", None))
                 if self.processor_enabled:
@@ -300,7 +303,10 @@ class TreasuryFlowApp(tk.Tk):
         elif self.auto_enabled.get() and not self.worker_running:
             try:
                 self._refresh_sources()
-                if has_changed(self.home_dir):
+                if has_upload_request(self.home_dir):
+                    self._append_log("درخواست جدید بارگذاری از شبکه دریافت شد.")
+                    self._start_process(True)
+                elif has_changed(self.home_dir):
                     self._append_log("تغییر در فایل‌های ورودی تشخیص داده شد.")
                     self._start_process(False)
                 elif find_sources(self.home_dir).daily:

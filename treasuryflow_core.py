@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from typing import Callable, Iterable
+import uuid
 
 
 APP_VERSION = "1.0.0"
@@ -24,6 +25,7 @@ DEFAULT_HORIZON = "1406/03/31"
 STATE_FILE = ".treasuryflow_state.json"
 SIGNATURE_FILE = "_last_processed_signature.txt"
 LOG_FILE = "treasuryflow.log"
+UPLOAD_REQUEST_FILE = "upload_request.json"
 ACCESS_FILE_ENV = "TREASURYFLOW_ACCESS_FILE"
 ACCESS_DASHBOARD = "treasury"
 ACCESS_TITLE = "داشبورد جریان نقد پوزیترون"
@@ -266,6 +268,30 @@ def log_message(home: Path, message: str) -> None:
         handle.write(f"[{timestamp}] {message.rstrip()}\n")
 
 
+def upload_request_path(home: Path) -> Path:
+    return Path(home) / ".treasuryflow" / UPLOAD_REQUEST_FILE
+
+
+def mark_upload_request(home: Path, files: Iterable[Path]) -> Path:
+    path = upload_request_path(home)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "id": uuid.uuid4().hex,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "files": [Path(item).name for item in files],
+    }
+    _atomic_text(path, json.dumps(payload, ensure_ascii=False, indent=2))
+    return path
+
+
+def has_upload_request(home: Path) -> bool:
+    return upload_request_path(home).exists()
+
+
+def clear_upload_request(home: Path) -> None:
+    upload_request_path(home).unlink(missing_ok=True)
+
+
 def has_changed(home: Path, sources: SourceSet | None = None) -> bool:
     sources = sources or find_sources(home)
     if not sources.daily:
@@ -440,6 +466,7 @@ def process_sources(
         publish_dashboard(index_path, emit)
     except Exception as exc:
         emit(f"هشدار انتشار GitHub Pages: {exc}")
+    clear_upload_request(home)
     emit(f"گزارش با موفقیت ساخته شد: {report_path.name}")
     return result
 

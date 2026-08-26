@@ -16,10 +16,23 @@ from treasuryflow_core import (
     find_sources,
     normalize_date,
     source_signature,
+    clear_upload_request,
+    has_upload_request,
+    mark_upload_request,
 )
 
 
 class TreasuryFlowCoreTests(unittest.TestCase):
+    def test_upload_request_lifecycle(self) -> None:
+        with TemporaryDirectory() as temp:
+            home = Path(temp)
+            marker = mark_upload_request(home, [home / "daily.xlsx"])
+            self.assertTrue(marker.exists())
+            self.assertTrue(has_upload_request(home))
+            self.assertIn("daily.xlsx", marker.read_text(encoding="utf-8"))
+            clear_upload_request(home)
+            self.assertFalse(has_upload_request(home))
+
     def test_html_builder_adds_generation_timestamp(self) -> None:
         with TemporaryDirectory() as temp:
             root = Path(temp)
