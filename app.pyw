@@ -35,14 +35,15 @@ def run_once_in_background() -> int:
 
 
 class TreasuryFlowApp(tk.Tk):
-    POLL_MS = 5000
+    POLL_MS = 1000
 
     def __init__(self) -> None:
         super().__init__()
         self.home_dir = application_home()
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.worker_running = False
-        self.auto_enabled = tk.BooleanVar(value=True)
+        self.processor_enabled = bool(os.environ.get("TREASURYFLOW_PUBLISH_REPO", "").strip())
+        self.auto_enabled = tk.BooleanVar(value=self.processor_enabled)
         self.status_text = tk.StringVar(value="در حال بررسی پوشه…")
         self.last_run_text = tk.StringVar(value="هنوز گزارشی ساخته نشده است")
         self.daily_text = tk.StringVar(value="—")
@@ -129,7 +130,12 @@ class TreasuryFlowApp(tk.Tk):
 
         options = ttk.Frame(shell)
         options.pack(fill="x", pady=(5, 10))
-        ttk.Checkbutton(options, text="بررسی خودکار فایل جدید هر ۵ ثانیه", variable=self.auto_enabled).pack(side="right")
+        ttk.Checkbutton(
+            options,
+            text="تشخیص فوری فایل جدید روی سیستم اصلی",
+            variable=self.auto_enabled,
+            state="normal" if self.processor_enabled else "disabled",
+        ).pack(side="right")
         ttk.Label(options, textvariable=self.last_run_text, style="Sub.TLabel").pack(side="left")
 
         log_card = ttk.Frame(shell, style="Card.TFrame", padding=10)
@@ -228,8 +234,11 @@ class TreasuryFlowApp(tk.Tk):
                 imported = import_files(self.home_dir, [Path(item) for item in selected])
                 self.events.put(("log", "فایل‌های دریافت‌شده: " + "، ".join(path.name for path in imported)))
                 self.events.put(("uploaded", None))
-                result = process_sources(self.home_dir, force=True, log=lambda text: self.events.put(("log", text)))
-                self.events.put(("done", result))
+                if self.processor_enabled:
+                    result = process_sources(self.home_dir, force=True, log=lambda text: self.events.put(("log", text)))
+                    self.events.put(("done", result))
+                else:
+                    self.events.put(("upload_only_done", imported))
             except Exception as error:
                 self.events.put(("error", error))
 
@@ -268,6 +277,11 @@ class TreasuryFlowApp(tk.Tk):
                         self.status_text.set("داشبورد با فایل‌های فعلی به‌روز است.")
                     else:
                         self.status_text.set(f"گزارش {payload.report_date} با موفقیت آماده شد.")
+                elif kind == "upload_only_done":
+                    self.worker_running = False
+                    self._refresh_sources()
+                    self.status_text.set("فایل‌ها ارسال شدند؛ سیستم اصلی آن‌ها را پردازش می‌کند.")
+                    messagebox.showinfo("TreasuryFlow", "فایل‌ها با موفقیت ارسال شدند. پردازش و انتشار روی سیستم اصلی انجام می‌شود.")
                 elif kind == "error":
                     self.worker_running = False
                     error = payload
@@ -280,7 +294,10 @@ class TreasuryFlowApp(tk.Tk):
         self.after(150, self._drain_events)
 
     def _auto_check(self) -> None:
-        if self.auto_enabled.get() and not self.worker_running:
+        if not self.processor_enabled:
+            if not self.worker_running:
+                self.status_text.set("ایستگاه بارگذاری؛ پردازش روی سیستم اصلی انجام می‌شود.")
+        elif self.auto_enabled.get() and not self.worker_running:
             try:
                 self._refresh_sources()
                 if has_changed(self.home_dir):
