@@ -89,7 +89,8 @@ COS.forEach(c=>{
 // ---------- tabs ----------
 const TABS=[['داشبورد مدیریتی',0],['منابع و مصارف',0],['نمای ۱۳ هفته',1],['استرس‌تست',1],['ریسک نقدینگی',0],
  ['محرک‌های نقد',0],['تقویم خزانه',0],['ریز تسهیلات',0],['چرخه بعدی تسهیلات',1],['خط زمانی تسهیلات',1],['چک‌های برگشتی و معوق',0],['ورودی‌های دستی',0],
- ['کپکس و سرمایه‌گذاری',1],['خطوط اعتباری',1],['نقطه سر به سر ماهانه',0],['تغییرات نسبت به گزارش قبل',1],['مفروضات',1],['توضیحات',0]];
+ ['کپکس و سرمایه‌گذاری',1],['خطوط اعتباری',1],['نقطه سر به سر ماهانه',0],['تغییرات نسبت به گزارش قبل',1],['مفروضات',1],['توضیحات',0],
+ ['ریز اسناد',0]];
 const tEl=document.getElementById('tabs');
 TABS.forEach((t,i)=>{const d=document.createElement('div');d.className='tab'+(i?'':' act');
  d.textContent=t[0];d.onclick=()=>{document.querySelectorAll('.tab').forEach((x,j)=>x.classList.toggle('act',j===i));
@@ -1068,9 +1069,55 @@ function exportBEPExcel(){
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
+// ================= ریز اسناد پرداختنی و دریافتنی =================
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const normDate=s=>String(s||'').trim().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[-.]/g,'/');
+let docFiltersReady=false;
+function setupDocumentFilters(){
+ if(docFiltersReady)return;
+ const bank=document.getElementById('docBank');
+ [...new Set((DATA.documents||[]).map(d=>d.bank).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fa')).forEach(v=>{
+  const o=document.createElement('option');o.value=v;o.textContent=v;bank.appendChild(o);
+ });
+ ['docType','docStatus','docBank'].forEach(id=>document.getElementById(id).addEventListener('change',renderDocuments));
+ ['docFrom','docTo','docSearch'].forEach(id=>document.getElementById(id).addEventListener('input',renderDocuments));
+ document.getElementById('docReset').onclick=()=>{
+  ['docType','docStatus','docBank','docFrom','docTo','docSearch'].forEach(id=>document.getElementById(id).value='');
+  renderDocuments();
+ };
+ docFiltersReady=true;
+}
+function renderDocuments(){
+ setupDocumentFilters();
+ const type=document.getElementById('docType').value;
+ const status=document.getElementById('docStatus').value;
+ const bank=document.getElementById('docBank').value;
+ const from=normDate(document.getElementById('docFrom').value);
+ const to=normDate(document.getElementById('docTo').value);
+ const q=document.getElementById('docSearch').value.trim().toLowerCase();
+ const docs=(DATA.documents||[]).filter(d=>SEL.has(d.co))
+  .filter(d=>!type||d.type===type).filter(d=>!status||d.status===status).filter(d=>!bank||d.bank===bank)
+  .filter(d=>!from||d.date>=from).filter(d=>!to||d.date<=to)
+  .filter(d=>!q||[d.number,d.beneficiary,d.subject,d.bank,d.account,coFa(d.co)].some(v=>String(v||'').toLowerCase().includes(q)))
+  .sort((a,b)=>a.date.localeCompare(b.date)||b.amt-a.amt);
+ const rec=docs.filter(d=>d.type==='receivable').reduce((s,d)=>s+d.amt,0);
+ const pay=docs.filter(d=>d.type==='payable').reduce((s,d)=>s+d.amt,0);
+ const overdue=docs.filter(d=>d.status==='overdue').reduce((s,d)=>s+d.amt,0);
+ document.getElementById('docSummary').innerHTML=`
+  <div class="doc-stat">تعداد اسناد<b>${fa(docs.length)}</b></div>
+  <div class="doc-stat">جمع دریافتنی<b class="pos">${fa(rec)}</b></div>
+  <div class="doc-stat">جمع پرداختنی<b class="neg">(${fa(pay)})</b></div>
+  <div class="doc-stat">خالص اسناد<b class="${rec-pay<0?'neg':'pos'}">${cell(rec-pay)}</b></div>`;
+ document.getElementById('docCount').textContent=`${fa(docs.length)} سند مطابق فیلتر — جمع سررسیدگذشته: ${fa(overdue)} میلیون تومان`;
+ let h='<table><thead><tr><th>نوع</th><th>وضعیت</th><th>تاریخ سررسید</th><th>شرکت</th><th>بانک</th><th>حساب/شعبه</th><th>ذینفع</th><th>موضوع</th><th>شماره سند</th><th>مبلغ</th></tr></thead><tbody>';
+ docs.forEach(d=>{h+=`<tr><td><span class="pill ${d.type==='receivable'?'g':'b'}">${d.type==='receivable'?'دریافتی':'پرداختنی'}</span></td><td><span class="pill ${d.status==='overdue'?'b':'g'}">${d.status==='overdue'?'سررسیدگذشته':'آتی'}</span></td><td>${esc(d.date)}</td><td>${esc(coFa(d.co))}</td><td>${esc(d.bank)||'—'}</td><td>${esc(d.account)||'—'}</td><td>${esc(d.beneficiary)||'—'}</td><td>${esc(d.subject)||'—'}</td><td style="direction:ltr">${esc(d.number)||'—'}</td><td>${cell(d.type==='payable'?-d.amt:d.amt)}</td></tr>`;});
+ if(!docs.length)h+='<tr><td colspan="10" style="text-align:center;color:var(--mut);padding:24px">سندی مطابق فیلتر فعلی پیدا نشد.</td></tr>';
+ const el=document.getElementById('docTbl');el.innerHTML=h+'</tbody></table>';makeSortable(el);
+}
+
 function renderAll(){
  const C=compute();
  renderExec(C);renderChart(C);renderMatrix(C);renderW13();renderStress();renderRisk();renderDrivers(C);
- renderCal();renderLoans();renderCycles();renderGantt();renderBounced();renderManual();renderCapex();renderCredit();renderDrill();renderDiff();renderBEP();
+ renderCal();renderLoans();renderCycles();renderGantt();renderBounced();renderManual();renderCapex();renderCredit();renderDrill();renderDiff();renderBEP();renderDocuments();
 }
 renderAll();

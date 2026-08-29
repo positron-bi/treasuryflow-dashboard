@@ -95,6 +95,13 @@ h2.sec{font-size:15.5px;margin:14px 0 9px;color:var(--blu);font-weight:700}
 .hm td.lbl,.hm th.lbl{min-width:150px;font-size:12.5px}
 .hm .g{background:#d5f0e0}.hm .y{background:#fbe8c4}.hm .r{background:#f6cdc7}.hm .off{background:#f1f3f6;color:#b6bdc7}
 select,input[type=number]{font-family:'Vazirmatn';font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:#fff}
+.doc-filters{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.doc-filters select,.doc-filters input{font-family:'Vazirmatn';font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;min-width:150px}
+.doc-filters input[type=text]{min-width:210px}
+.doc-summary{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.doc-stat{background:#f8fafc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;text-align:center}
+.doc-stat b{display:block;font-size:17px;color:var(--blu);margin-top:3px}
+@media(max-width:700px){.doc-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.doc-filters>*{flex:1 1 145px;min-width:0!important}}
 .bep-input{width:95px;font-family:'Vazirmatn';font-size:12.5px;padding:4px 6px;border:1px solid #e6d9a0;border-radius:5px;background:#fdf8ea;text-align:center;direction:ltr}
 .bep-tbl th,.bep-tbl td{padding:3px 8px;line-height:1.2}
 .bep-tbl .bep-input{padding:2px 5px;width:88px}
@@ -341,4 +348,21 @@ select,input[type=number]{font-family:'Vazirmatn';font-size:13px;padding:6px 10p
 برای تسهیلاتی که تجدید می‌شوند، ادامهٔ تجدید تسهیلات تا افق مدل شده است (تب «چرخه بعدی تسهیلات»). دورهٔ تناوب هر چرخه از میانگین فاصلهٔ سررسیدهای واقعی همان نوع+بانک در همین فایل برآورد می‌شود؛ در نبود نمونه کافی، پیش‌فرض نوع تسهیلات جایگزین می‌شود. برای پرهیز از دوباره‌شماری با اقساط واقعی که از قبل در شیت Loan آمده (عمدتاً اقساط ماهانه مرابحه)، مدل فقط از «آخرین ردیف شناخته‌شدهٔ» هر شماره تسهیلات ادامه می‌یابد. تسهیلات کوتاه‌مدت (تناوب ≤۱۴ روز، عمدتاً خرید دین) فقط تا افق ۱۳هفته‌ای برآورد شده‌اند چون فرض تکرار بدون‌تغییر یک تجدید چندروزه برای ۱۱ ماه آینده قابل‌اتکا نیست؛ تسهیلات با تناوب بلندتر (مرابحه/مضاربه) تا پایان افق کامل مدل شده‌اند.</div>
  <div class="note"><h3>یادداشت معماری</h3>
 تغییرات نسخه ۲.۱: دفترچه مفروضات نسخه‌دار، ردّ تغییرات روزانه نسبت به اسنپ‌شات قبلی، نمای غلتان ۱۳ هفته‌ای مستقل از باکت‌بندی نمایش، استرس‌تست تعاملی روی نرخ وصول و نرخ تجدید، و مدل چرخهٔ بعدی تسهیلات. اسنپ‌شات هر روز در پایپ‌لاین ذخیره می‌شود تا مبنای مقایسه فردا و بعداً Forecast Accuracy (نسخه ۳) باشد.</div>
+</div>
+
+<!-- ۱۳: ریز اسناد پرداختنی و دریافتنی -->
+<div class="pane" id="p13">
+ <div class="msg">ریز اسناد پرداختنی و دریافتنی — مبالغ به میلیون تومان؛ انتخاب شرکت‌ها از فیلتر بالای داشبورد اعمال می‌شود.</div>
+ <div class="doc-filters">
+  <select id="docType"><option value="">همه اسناد</option><option value="payable">پرداختنی</option><option value="receivable">دریافتی</option></select>
+  <select id="docStatus"><option value="">همه وضعیت‌ها</option><option value="upcoming">آتی</option><option value="overdue">سررسیدگذشته</option></select>
+  <select id="docBank"><option value="">همه بانک‌ها</option></select>
+  <input type="text" id="docFrom" placeholder="از تاریخ؛ مثال ۱۴۰۵/۰۶/۰۱" inputmode="numeric">
+  <input type="text" id="docTo" placeholder="تا تاریخ؛ مثال ۱۴۰۵/۰۶/۳۱" inputmode="numeric">
+  <input type="text" id="docSearch" placeholder="جستجو: شماره، ذینفع، موضوع...">
+  <button class="btn" id="docReset">پاک‌کردن فیلترها</button>
+ </div>
+ <div class="doc-summary" id="docSummary"></div>
+ <div class="legend" id="docCount"></div>
+ <div class="tblwrap" id="docTbl" style="max-height:68vh;overflow:auto"></div>
 </div>

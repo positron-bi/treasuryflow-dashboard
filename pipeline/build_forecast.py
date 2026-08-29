@@ -224,6 +224,7 @@ STRESS_CATS = {'nr': 'collect', 'renew': 'renew'}
 companies = list(opening.keys())
 agg = {cid: defaultdict(lambda: [0.0]*len(B)) for cid, _, _ in CATS}
 TX = []
+DOCUMENTS = []
 
 def add(cid, co_raw, bucket_idx, amt_rial):
     co = co_key(co_raw)
@@ -249,6 +250,15 @@ def read_notes(sheet_name, cid_future, cid_past, is_receivable):
         if not ds or not isinstance(amt, (int, float)): continue
         ds_s = str(ds).strip()
         if not parse(ds_s): continue
+        DOCUMENTS.append({
+            'type': 'receivable' if is_receivable else 'payable',
+            'co': co_key(co), 'bank': str(r[1] or ''),
+            'account': str(r[2] or ''), 'beneficiary': str(ben or ''),
+            'subject': '' if is_receivable else str(r[4] or ''),
+            'number': str(chno or ''), 'date': ds_s,
+            'amt': round(abs(float(amt)) / MT, 1),
+            'status': 'overdue' if ds_s < REPORT_DATE else 'upcoming',
+        })
         sign = 1 if is_receivable else -1
         desc = str(ben or '')
         if ds_s < REPORT_DATE:
@@ -563,7 +573,8 @@ DATA = {
  'opening': {c: round(opening.get(c,0.0),1) for c in companies},
  'agg': {cid: {co: [round(v,1) for v in arr] for co, arr in m.items()} for cid, m in agg.items()},
  'loans': loans, 'bounced': bounced, 'vaset': [], 'manual': manual_display,
- 'holidays': HOLIDAYS, 'accounts': accounts, 'tx': TX, 'projected': projected, 'timeline': timeline,
+ 'holidays': HOLIDAYS, 'accounts': accounts, 'tx': TX, 'documents': DOCUMENTS,
+ 'projected': projected, 'timeline': timeline,
  'policy': policy, 'assumptions': ASSUMPTIONS, 'diff': diff,
  'capex': capex, 'credit_lines': credit_lines, 'sales_budget': sales_budget,
 }
@@ -574,7 +585,7 @@ with open(DATA_JSON, 'w', encoding='utf-8') as f:
 with open(os.path.join(SNAP_DIR, snapshot_key(REPORT_DATE)+'.json'), 'w', encoding='utf-8') as f:
     json.dump(DATA, f, ensure_ascii=False)
 
-print(f'buckets: {len(B)} | loans: {len(loans)} | bounced: {len(bounced)} | manual: {len(manual_display)} | '
-      f'tx: {len(TX)} | projected: {len(projected)}')
+print(f'buckets: {len(B)} | loans: {len(loans)} | documents: {len(DOCUMENTS)} | bounced: {len(bounced)} | '
+      f'manual: {len(manual_display)} | tx: {len(TX)} | projected: {len(projected)}')
 print('opening (m.toman):', {c: round(v) for c,v in opening.items()}, '| sum:', round(sum(opening.values())))
 print('diff available:', diff is not None, ('vs '+diff.get('prev_date','')) if diff else '')
