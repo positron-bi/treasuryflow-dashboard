@@ -160,7 +160,7 @@ const barEndLabels={
    meta.data.forEach((bar,i)=>{
     const val=ds.data[i]; if(Math.abs(val)<0.5) return;
     ctx.save();
-    ctx.font='600 11px Vazirmatn'; ctx.fillStyle='#2b3a4a';
+    ctx.font=`600 ${window.innerWidth<=700?9:11}px Vazirmatn`; ctx.fillStyle='#2b3a4a';
     ctx.textAlign='left'; ctx.textBaseline='middle';
     ctx.fillText(fa(val), bar.x+6, bar.y);
     ctx.restore();
@@ -168,6 +168,14 @@ const barEndLabels={
   });
  }
 };
+
+// در عرض کم، padding ثابت ۶۰px بخش بزرگی از ناحیه رسم را می‌بلعد.
+// grace روی محور x محل امن برچسب انتهای میله را داخل خود نمودار فراهم می‌کند.
+const horizontalLayout=()=>({padding:{right:window.innerWidth<=700?4:60}});
+const horizontalScales=()=>({
+ x:{grace:window.innerWidth<=700?'18%':0,ticks:{callback:v=>fa(v),maxTicksLimit:window.innerWidth<=700?4:8,font:{size:window.innerWidth<=700?9:11}}},
+ y:{ticks:{font:{size:window.innerWidth<=700?9:11},padding:window.innerWidth<=700?2:6}}
+});
 
 let chCo=null,chBank=null,chLoanCo=null,chLoanBank=null,chBlockCo=null,chBlockBank=null;
 const PALETTE=['#2c5f8a','#7d3c98','#1e8449','#c0392b','#d68910','#148f77','#7f8c8d','#a04000'];
@@ -226,9 +234,9 @@ function renderExec(C){
  chCo=new Chart(document.getElementById('chCo'),{type:'bar',
   data:{labels:cos.map(coFa),datasets:[{data:openVals,backgroundColor:cos.map((_,i)=>PALETTE[i%PALETTE.length])}]},
   plugins:[barEndLabels],
-  options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:60}},plugins:{legend:{display:false},
+  options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},
-   scales:{x:{ticks:{callback:v=>fa(v)}}},
+   scales:horizontalScales(),
    onClick:(e,el)=>{if(el.length){document.getElementById('drillCo').value=cos[el[0].index];renderDrill();}}}});
 
  // نمودار بانک: هرس بانک‌های زیر ۵٪ سهم به «سایر» تا نویز حذف شود
@@ -246,8 +254,8 @@ function renderExec(C){
  chBank=new Chart(document.getElementById('chBank'),{type:'bar',
   data:{labels:top.map(x=>x[0]),datasets:[{data:top.map(x=>x[1]),backgroundColor:top.map((x,i)=>x[0].startsWith('سایر')?'#b7c3cf':PALETTE[i%PALETTE.length])}]},
   plugins:[barEndLabels],
-  options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:60}},plugins:{legend:{display:false},
-   tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:{x:{ticks:{callback:v=>fa(v)}}}}});
+  options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
+   tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:horizontalScales()}});
 
  // مانده مسدود بانکی به تفکیک شرکت و بانک (شیت Cash — ستون مسدودی)
  const blkCo={},blkBank={};
@@ -259,14 +267,14 @@ function renderExec(C){
  chBlockCo=new Chart(document.getElementById('chBlockCo'),{type:'bar',
   data:{labels:blkCoE.map(([co])=>coFa(co)),datasets:[{data:blkCoE.map(([,v])=>v),backgroundColor:blkCoE.map((_,i)=>PALETTE[i%PALETTE.length])}]},
   plugins:[barEndLabels],
-  options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:60}},plugins:{legend:{display:false},
-   tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:{x:{ticks:{callback:v=>fa(v)}}}}});
+  options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
+   tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:horizontalScales()}});
  if(chBlockBank)chBlockBank.destroy();
  chBlockBank=new Chart(document.getElementById('chBlockBank'),{type:'bar',
   data:{labels:blkBankE.map(([b])=>b),datasets:[{data:blkBankE.map(([,v])=>v),backgroundColor:blkBankE.map((_,i)=>PALETTE[i%PALETTE.length])}]},
   plugins:[barEndLabels],
-  options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:60}},plugins:{legend:{display:false},
-   tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:{x:{ticks:{callback:v=>fa(v)}}}}});
+  options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
+   tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:horizontalScales()}});
  const w=selTx().filter(t=>{const b=B.findIndex(x=>x.start<=t.d&&t.d<=x.end);return b>=0&&b<=idx30;});
  const mk=(list,el)=>{let h='<table><thead><tr><th>تاریخ</th><th class="lbl" style="min-width:180px">شرح</th><th>شرکت</th><th>مبلغ</th></tr></thead><tbody>';
   list.forEach(t=>{h+=`<tr><td class="n">${t.d}</td><td class="lbl" style="min-width:180px">${t.desc}</td><td>${coFa(t.co)}</td><td class="n">${cell(t.amt)}</td></tr>`;});
@@ -776,16 +784,16 @@ function renderLoans(){
  chLoanCo=new Chart(document.getElementById('chLoanCo'),{type:'bar',
   data:{labels:coEntries.map(([co])=>coFa(co)),datasets:[{data:coEntries.map(([,v])=>v),backgroundColor:coEntries.map((_,i)=>PALETTE[i%PALETTE.length])}]},
   plugins:[barEndLabels],
-  options:{maintainAspectRatio:false,indexAxis:'y',layout:{padding:{right:60}},plugins:{legend:{display:false},
+  options:{maintainAspectRatio:false,indexAxis:'y',layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},
-   scales:{x:{ticks:{callback:v=>fa(v)}}}}});
+   scales:horizontalScales()}});
  if(chLoanBank)chLoanBank.destroy();
  chLoanBank=new Chart(document.getElementById('chLoanBank'),{type:'bar',
   data:{labels:bankEntries.map(([b])=>b),datasets:[{data:bankEntries.map(([,v])=>v),backgroundColor:bankEntries.map((_,i)=>PALETTE[i%PALETTE.length])}]},
   plugins:[barEndLabels],
-  options:{maintainAspectRatio:false,indexAxis:'y',layout:{padding:{right:60}},plugins:{legend:{display:false},
+  options:{maintainAspectRatio:false,indexAxis:'y',layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},
-   scales:{x:{ticks:{callback:v=>fa(v)}}}}});
+   scales:horizontalScales()}});
 
  const piv={};
  L.forEach(l=>{const k=`${l.type}|${l.bank}|${l.co}`;
