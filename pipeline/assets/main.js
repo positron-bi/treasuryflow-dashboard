@@ -95,7 +95,8 @@ const tEl=document.getElementById('tabs');
 TABS.forEach((t,i)=>{const d=document.createElement('div');d.className='tab'+(i?'':' act');
  d.textContent=t[0];d.onclick=()=>{document.querySelectorAll('.tab').forEach((x,j)=>x.classList.toggle('act',j===i));
  document.querySelectorAll('.pane').forEach((x,j)=>x.classList.toggle('act',j===i));
- if(t[0]==='خط زمانی تسهیلات') requestAnimationFrame(renderGantt);};tEl.appendChild(d);});
+ if(t[0]==='خط زمانی تسهیلات') requestAnimationFrame(renderGantt);
+ if(t[0]==='ریز تسهیلات') requestAnimationFrame(()=>requestAnimationFrame(renderLoans));};tEl.appendChild(d);});
 document.getElementById('p0').classList.add('act');
 
 // ---------- core aggregation ----------
