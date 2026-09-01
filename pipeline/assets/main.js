@@ -8,7 +8,7 @@ const coFa=k=>(COS.find(c=>c.key===k)||{fa:k}).fa;
 let SEL=new Set(COS.map(c=>c.key));
 let POL={}; COS.forEach(c=>POL[c.key]=(DATA.policy[c.key]||{min:0}).min);
 Chart.defaults.font.family='Vazirmatn';
-document.getElementById('verBadge').textContent=DATA.version||('v4.3 | داده تا '+DATA.report_date);
+document.getElementById('verBadge').textContent=DATA.version||('v4.4 | داده تا '+DATA.report_date);
 if(DATA.generated_at){
  const updated=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'short',timeStyle:'medium'}).format(new Date(DATA.generated_at));
  document.getElementById('updatedBadge').textContent='آخرین به‌روزرسانی: '+updated;
@@ -169,13 +169,43 @@ const barEndLabels={
  }
 };
 
-// در عرض کم، padding ثابت ۶۰px بخش بزرگی از ناحیه رسم را می‌بلعد.
-// grace روی محور x محل امن برچسب انتهای میله را داخل خود نمودار فراهم می‌کند.
-const horizontalLayout=()=>({padding:{right:window.innerWidth<=700?4:60}});
+// در عرض کم، برچسب‌های محور y داخل نمودار قرار می‌گیرند تا فضای رسم
+// از دو طرف کارت متقارن و تا حد ممکن عریض باقی بماند.
+const compactHorizontal=()=>window.innerWidth<=700;
+const horizontalLayout=()=>({padding:{left:compactHorizontal()?6:0,right:compactHorizontal()?6:60}});
 const horizontalScales=()=>({
- x:{grace:window.innerWidth<=700?'18%':0,ticks:{callback:v=>fa(v),maxTicksLimit:window.innerWidth<=700?4:8,font:{size:window.innerWidth<=700?9:11}}},
- y:{ticks:{font:{size:window.innerWidth<=700?9:11},padding:window.innerWidth<=700?2:6}}
+ x:{grace:compactHorizontal()?'14%':0,ticks:{callback:v=>fa(v),maxTicksLimit:compactHorizontal()?4:8,font:{size:compactHorizontal()?9:11}}},
+ y:{
+  grid:{drawTicks:!compactHorizontal()},
+  border:{display:!compactHorizontal()},
+  ticks:{
+   display:!compactHorizontal(),
+   color:'#4b5563',
+   font:{size:11},
+   padding:6
+  }
+ }
 });
+
+// نام دسته‌ها روی موبایل داخل ناحیه رسم قرار می‌گیرد؛ به این ترتیب محور y
+// هیچ عرضی از نمودار نمی‌گیرد و متن نیز در لبه کارت بریده نمی‌شود.
+const mobileCategoryLabels={
+ id:'mobileCategoryLabels',
+ afterDatasetsDraw(chart){
+  if(!compactHorizontal()) return;
+  const {ctx,chartArea}=chart, meta=chart.getDatasetMeta(0);
+  meta.data.forEach((bar,i)=>{
+   const label=String(chart.data.labels[i]??''); if(!label) return;
+   ctx.save();
+   ctx.font='600 9px Vazirmatn'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.direction='rtl';
+   const labelW=Math.min(ctx.measureText(label).width+8,chartArea.width*.34), x=chartArea.left+3;
+   ctx.fillStyle='rgba(255,255,255,.88)'; ctx.fillRect(x-2,bar.y-8,labelW,16);
+   ctx.beginPath(); ctx.rect(x,bar.y-8,labelW-4,16); ctx.clip();
+   ctx.fillStyle='#4b5563'; ctx.fillText(label,x,bar.y);
+   ctx.restore();
+  });
+ }
+};
 
 let chCo=null,chBank=null,chLoanCo=null,chLoanBank=null,chBlockCo=null,chBlockBank=null;
 const PALETTE=['#2c5f8a','#7d3c98','#1e8449','#c0392b','#d68910','#148f77','#7f8c8d','#a04000'];
@@ -233,7 +263,7 @@ function renderExec(C){
  if(chCo)chCo.destroy();
  chCo=new Chart(document.getElementById('chCo'),{type:'bar',
   data:{labels:cos.map(coFa),datasets:[{data:openVals,backgroundColor:cos.map((_,i)=>PALETTE[i%PALETTE.length])}]},
-  plugins:[barEndLabels],
+  plugins:[barEndLabels,mobileCategoryLabels],
   options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},
    scales:horizontalScales(),
@@ -253,7 +283,7 @@ function renderExec(C){
  if(chBank)chBank.destroy();
  chBank=new Chart(document.getElementById('chBank'),{type:'bar',
   data:{labels:top.map(x=>x[0]),datasets:[{data:top.map(x=>x[1]),backgroundColor:top.map((x,i)=>x[0].startsWith('سایر')?'#b7c3cf':PALETTE[i%PALETTE.length])}]},
-  plugins:[barEndLabels],
+  plugins:[barEndLabels,mobileCategoryLabels],
   options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:horizontalScales()}});
 
@@ -266,13 +296,13 @@ function renderExec(C){
  if(chBlockCo)chBlockCo.destroy();
  chBlockCo=new Chart(document.getElementById('chBlockCo'),{type:'bar',
   data:{labels:blkCoE.map(([co])=>coFa(co)),datasets:[{data:blkCoE.map(([,v])=>v),backgroundColor:blkCoE.map((_,i)=>PALETTE[i%PALETTE.length])}]},
-  plugins:[barEndLabels],
+  plugins:[barEndLabels,mobileCategoryLabels],
   options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:horizontalScales()}});
  if(chBlockBank)chBlockBank.destroy();
  chBlockBank=new Chart(document.getElementById('chBlockBank'),{type:'bar',
   data:{labels:blkBankE.map(([b])=>b),datasets:[{data:blkBankE.map(([,v])=>v),backgroundColor:blkBankE.map((_,i)=>PALETTE[i%PALETTE.length])}]},
-  plugins:[barEndLabels],
+  plugins:[barEndLabels,mobileCategoryLabels],
   options:{indexAxis:'y',maintainAspectRatio:false,layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},scales:horizontalScales()}});
  const w=selTx().filter(t=>{const b=B.findIndex(x=>x.start<=t.d&&t.d<=x.end);return b>=0&&b<=idx30;});
@@ -783,14 +813,14 @@ function renderLoans(){
  if(chLoanCo)chLoanCo.destroy();
  chLoanCo=new Chart(document.getElementById('chLoanCo'),{type:'bar',
   data:{labels:coEntries.map(([co])=>coFa(co)),datasets:[{data:coEntries.map(([,v])=>v),backgroundColor:coEntries.map((_,i)=>PALETTE[i%PALETTE.length])}]},
-  plugins:[barEndLabels],
+  plugins:[barEndLabels,mobileCategoryLabels],
   options:{maintainAspectRatio:false,indexAxis:'y',layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},
    scales:horizontalScales()}});
  if(chLoanBank)chLoanBank.destroy();
  chLoanBank=new Chart(document.getElementById('chLoanBank'),{type:'bar',
   data:{labels:bankEntries.map(([b])=>b),datasets:[{data:bankEntries.map(([,v])=>v),backgroundColor:bankEntries.map((_,i)=>PALETTE[i%PALETTE.length])}]},
-  plugins:[barEndLabels],
+  plugins:[barEndLabels,mobileCategoryLabels],
   options:{maintainAspectRatio:false,indexAxis:'y',layout:horizontalLayout(),plugins:{legend:{display:false},
    tooltip:{rtl:true,callbacks:{label:c=>fa(c.raw)+' م.ت'}}},
    scales:horizontalScales()}});
