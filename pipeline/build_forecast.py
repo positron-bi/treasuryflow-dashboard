@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 build_forecast.py — استخراج و پیش‌بینی جریان نقد گروه پوزیترون (Positron TMS)
-نسخهٔ v4.2 — بازسازی‌شده از تصمیمات نهایی نشست ۱۴۰۵/۰۵ (مدل تجدید ساده‌شده)
+نسخهٔ v4.3 — بازسازی‌شده از تصمیمات نهایی نشست ۱۴۰۵/۰۵ (مدل تجدید ساده‌شده)
 
 ⚠️ این فایل «بازسازی از حافظهٔ گفتگو» است، نه استخراج مستقیم از یک نسخهٔ کارکردهٔ
    قبلی (بر خلاف make_html_v2.py). قبل از تکیه‌کردن کامل روی آن برای گزارش بعدی،
@@ -566,7 +566,7 @@ if snap_files:
 
 # ---------------- سریالایز خروجی ----------------
 DATA = {
- 'report_date': REPORT_DATE, 'version': f'v4.2 | داده تا {REPORT_DATE}',
+ 'report_date': REPORT_DATE, 'version': f'v4.3 | داده تا {REPORT_DATE}',
  'buckets': B, 'companies': [{'key': c, 'fa': CO_FA.get(c, c)} for c in companies],
  'cats': [{'id': c[0], 'label': c[1], 'dir': c[2]} for c in CATS],
  'stress_cats': STRESS_CATS,

@@ -8,7 +8,7 @@ const coFa=k=>(COS.find(c=>c.key===k)||{fa:k}).fa;
 let SEL=new Set(COS.map(c=>c.key));
 let POL={}; COS.forEach(c=>POL[c.key]=(DATA.policy[c.key]||{min:0}).min);
 Chart.defaults.font.family='Vazirmatn';
-document.getElementById('verBadge').textContent=DATA.version||('v4.2 | داده تا '+DATA.report_date);
+document.getElementById('verBadge').textContent=DATA.version||('v4.3 | داده تا '+DATA.report_date);
 if(DATA.generated_at){
  const updated=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'short',timeStyle:'medium'}).format(new Date(DATA.generated_at));
  document.getElementById('updatedBadge').textContent='آخرین به‌روزرسانی: '+updated;
