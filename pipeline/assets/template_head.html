@@ -48,7 +48,8 @@ h1{font-size:21px;font-weight:700}
 @media(max-width:1000px){.grid2{grid-template-columns:1fr}}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
 .panel h3{font-size:14px;color:var(--blu);margin-bottom:10px;font-weight:700}
-.cbox{height:250px}
+.cbox{height:250px;width:100%;min-width:0;position:relative}
+.cbox canvas{display:block;max-width:100%}
 .msg{font-size:15px;font-weight:600;margin:4px 0 12px}
 .msg .hl{color:var(--neg);font-weight:700}
 .chartbox{height:340px;margin-bottom:14px}
@@ -124,8 +125,7 @@ select,input[type=number]{font-family:'Vazirmatn';font-size:13px;padding:6px 10p
  .wrap{padding:6px}
  .pane{padding:7px}
  #p7 .panel{padding:10px;overflow:hidden}
- #p7 .cbox{height:260px;min-height:260px;width:100%;position:relative}
- #p7 .cbox canvas{display:block!important;width:100%!important;height:100%!important;max-width:100%}
+ #p7 .cbox{height:260px;min-height:260px}
  .cal-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:100%;min-width:0;overflow:visible}
  .cal{width:100%;min-width:0;max-width:100%}
  .cal-wday,.cal-days{grid-template-columns:repeat(7,minmax(0,1fr));width:100%;min-width:0}
