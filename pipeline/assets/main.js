@@ -8,7 +8,7 @@ const coFa=k=>(COS.find(c=>c.key===k)||{fa:k}).fa;
 let SEL=new Set(COS.map(c=>c.key));
 let POL={}; COS.forEach(c=>POL[c.key]=(DATA.policy[c.key]||{min:0}).min);
 Chart.defaults.font.family='Vazirmatn';
-document.getElementById('verBadge').textContent=DATA.version||('v4.4 | داده تا '+DATA.report_date);
+document.getElementById('verBadge').textContent=DATA.version||('v4.5 | داده تا '+DATA.report_date);
 if(DATA.generated_at){
  const updated=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'short',timeStyle:'medium'}).format(new Date(DATA.generated_at));
  document.getElementById('updatedBadge').textContent='آخرین به‌روزرسانی: '+updated;
@@ -125,6 +125,70 @@ const idx90=(()=>{let k=NB-1;for(let i=0;i<NB;i++)if(B[i].doff>90){k=i-1;break;}
 const idx180=(()=>{let k=NB-1;for(let i=0;i<NB;i++)if(B[i].doff>180){k=i-1;break;}return k;})();
 const selTx=()=>DATA.tx.filter(t=>SEL.has(t.co));
 function bucketOfDate(d){return B.findIndex(x=>x.start<=d&&d<=x.end);}
+
+// ---------- خروجی آماده برای تحلیل در Claude (بدون API) ----------
+function claudeCsvCell(value, numeric=false){
+ if(value==null) value='';
+ let s=String(value);
+ // جلوگیری از تفسیر متن به‌عنوان فرمول هنگام بازشدن CSV در Excel.
+ if(!numeric && /^[=+\-@]/.test(s)) s="'"+s;
+ return '"'+s.replace(/"/g,'""')+'"';
+}
+function buildClaudeExport(){
+ const C=compute();
+ const selected=[...SEL];
+ const selectedFa=selected.map(coFa).join('، ');
+ const catDir={}; CATS.forEach(c=>catDir[c.id]=c.dir);
+ const headers=['نوع رکورد','تاریخ گزارش','تاریخ رویداد','بازه','شرکت','بانک','شناسه','دسته','شرح','جهت','مبلغ (میلیون تومان)','ورودی (میلیون تومان)','خروجی (میلیون تومان)','خالص (میلیون تومان)','مانده (میلیون تومان)','مسدودی (میلیون تومان)','وضعیت','منبع'];
+ const rows=[];
+ B.forEach((b,i)=>rows.push(['خلاصه جریان',DATA.report_date,b.start,b.start===b.end?b.start:(b.start+' تا '+b.end),selectedFa,'','','خلاصه بازه','تجمیع شرکت‌های انتخاب‌شده','', '',C.tin[i],C.tout[i],C.net[i],C.closeArr[i],'','','محاسبه داشبورد']));
+ (DATA.accounts||[]).filter(a=>SEL.has(a.co)).forEach(a=>rows.push(['حساب بانکی',DATA.report_date,DATA.report_date,'',coFa(a.co),a.bank,a.acct,'موجودی حساب','مانده و وجه مسدود','موجودی','','','','',a.bal,a.blocked,'فعال','گزارش روزانه خزانه']));
+ (DATA.tx||[]).filter(t=>SEL.has(t.co)).forEach(t=>{
+  const dir=catDir[t.cat]==='in'?'ورودی':'خروجی';
+  rows.push(['جریان نقد',DATA.report_date,t.d,'',coFa(t.co),'','',CATL[t.cat]||t.cat,t.desc||'',dir,t.amt,dir==='ورودی'?t.amt:'',dir==='خروجی'?t.amt:'',t.amt,'','','برنامه‌ریزی‌شده','گزارش روزانه/مدل داشبورد']);
+ });
+ (DATA.loans||[]).filter(l=>SEL.has(l.co)).forEach(l=>rows.push(['تسهیلات',DATA.report_date,l.pay||l.due,'',coFa(l.co),l.bank,l.no,l.type,'سررسید: '+(l.due||'—')+(l.renew?' | تجدید: '+l.renew:''),'خروجی',-Math.abs(l.total||0),'',-Math.abs(l.total||0),-Math.abs(l.total||0),'','',''+(l.status||''),'گزارش تسهیلات']));
+ (DATA.projected||[]).filter(p=>SEL.has(p.co)).forEach(p=>rows.push(['چرخه برآوردی تسهیلات',DATA.report_date,p.due,'',coFa(p.co),p.bank,p.no,p.type,'چرخه '+p.cycle+(p.renew?' | تجدید: '+p.renew:''),'خروجی',-Math.abs(p.total||0),'',-Math.abs(p.total||0),-Math.abs(p.interest||0),'','','برآوردی','مدل چرخه تسهیلات']));
+ (DATA.bounced||[]).filter(x=>SEL.has(x.co)).forEach(x=>rows.push(['چک برگشتی/معوق',DATA.report_date,x.date,'',coFa(x.co),'',x.chno,'دریافتنی پرریسک',x.ben||'','ورودی پرریسک',x.amt,x.amt,'','','','','معوق',x.src||'چک برگشتی']));
+ const numericCols=new Set([10,11,12,13,14,15]);
+ const csv=[headers,...rows].map(r=>r.map((v,i)=>claudeCsvCell(v,numericCols.has(i))).join(',')).join('\r\n');
+ const start=B.length?B[0].start:DATA.report_date;
+ const end=B.length?B[B.length-1].end:DATA.report_date;
+ const prompt=`نقش شما:\nبه‌عنوان تحلیلگر ارشد خزانه و برنامه‌ریزی مالی، فایل CSV پیوست‌شده از داشبورد TreasuryFlow را بررسی کن.\n\nمشخصات گزارش:\n- شرکت/گروه: ${selectedFa}\n- تاریخ گزارش: ${DATA.report_date}\n- بازه داده: ${start} تا ${end}\n- واحد ارقام: میلیون تومان\n- فایل شامل ردیف‌های خلاصه جریان، حساب بانکی، جریان نقد، تسهیلات، چرخه برآوردی و چک‌های برگشتی/معوق است.\n\nوظایف:\n1. ابتدا کیفیت داده‌ها، ستون‌های خالی، مقادیر غیرعادی و ناسازگاری‌ها را بررسی کن.\n2. مانده نقد فعلی، ورودی‌ها، خروجی‌ها و خالص جریان نقد را خلاصه کن.\n3. کسری یا مازاد نقدینگی را در افق‌های ۷، ۳۰ و ۹۰ روز محاسبه کن.\n4. بزرگ‌ترین پرداخت‌ها و دریافت‌های مؤثر را مشخص کن.\n5. تعهدات سررسیدشده، معوق و پرریسک را شناسایی کن.\n6. نتایج را به تفکیک شرکت، بانک، نوع جریان و تاریخ تحلیل کن.\n7. سه سناریوی خوش‌بینانه، محتمل و بدبینانه ارائه بده.\n8. برای هر ریسک، اقدام پیشنهادی و میزان فوریت تعیین کن.\n9. هر نتیجه‌ای که مستقیماً از داده قابل اثبات نیست با عنوان «فرض» مشخص کن.\n10. در پایان، پنج سؤال مهم برای تکمیل تحلیل از من بپرس.\n\nقالب پاسخ:\n- خلاصه مدیریتی\n- شاخص‌های کلیدی\n- پیش‌بینی جریان نقد\n- ریسک‌ها و هشدارها\n- سناریوها\n- اقدامات پیشنهادی\n- سؤالات تکمیلی\n\nقواعد:\n- هیچ عددی را حدس نزن.\n- تاریخ‌ها را شمسی نمایش بده.\n- اعداد منفی را داخل پرانتز بنویس.\n- مبالغ را با جداکننده هزارگان نمایش بده.\n- منبع هر نتیجه را با نام ستون‌های فایل مشخص کن.\n- اگر داده کافی نیست، دقیقاً اعلام کن چه اطلاعاتی کم است.`;
+ return {csv,prompt,rowCount:rows.length};
+}
+function copyClaudePrompt(text){
+ const fallback=()=>{const el=document.createElement('textarea');el.value=text;el.setAttribute('readonly','');el.style.cssText='position:fixed;opacity:0;pointer-events:none';document.body.appendChild(el);el.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}document.body.removeChild(el);return ok;};
+ if(navigator.clipboard&&window.isSecureContext) return navigator.clipboard.writeText(text).then(()=>true).catch(fallback);
+ return Promise.resolve(fallback());
+}
+let claudeToastTimer;
+function showClaudeToast(html){
+ const el=document.getElementById('claudeToast');
+ el.innerHTML=html;el.classList.add('show');
+ clearTimeout(claudeToastTimer);claudeToastTimer=setTimeout(()=>el.classList.remove('show'),9000);
+}
+function openClaudeAnalysis(){
+ const btn=document.getElementById('claudeAnalyzeBtn');
+ if(!SEL.size){showClaudeToast('ابتدا حداقل یک شرکت را از فیلتر بالای داشبورد انتخاب کنید.');return;}
+ btn.disabled=true;
+ const opened=window.open('https://claude.ai/new','_blank');
+ if(opened) opened.opener=null;
+ try{
+  const out=buildClaudeExport();
+  const blob=new Blob(['\ufeff'+out.csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`TreasuryFlow_Claude_${String(DATA.report_date).replace(/\//g,'-')}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1500);
+  copyClaudePrompt(out.prompt).then(copied=>{
+   const copyMsg=copied?'متن تحلیل کپی شد':'کپی خودکار متن ممکن نبود';
+   const openMsg=opened?'Claude در تب جدید باز شد':'مرورگر تب جدید را مسدود کرد؛ <a href="https://claude.ai/new" target="_blank" rel="noopener">Claude را باز کنید</a>';
+   showClaudeToast(`فایل شامل ${fa(out.rowCount)} ردیف دانلود شد؛ ${copyMsg}. ${openMsg}. حالا CSV را ضمیمه و متن را Paste کنید.`);
+  });
+ }catch(err){
+  showClaudeToast('ساخت خروجی انجام نشد: '+String(err&&err.message||err));
+ }finally{setTimeout(()=>{btn.disabled=false;},600);}
+}
 
 // دیدگاه خالص واقعی: چون در مدل «هر قسط مستقل» عمداً دوباره‌شماری داریم (پرداخت کامل سپس
 // تجدید اصل ۱-۲ روز بعد)، حداقل مانده خام گاهی توسط این نویز زمان‌بندی به‌شدت منفی نشان داده

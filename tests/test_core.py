@@ -43,6 +43,10 @@ class TreasuryFlowCoreTests(unittest.TestCase):
             html = output.read_text(encoding="utf-8")
             self.assertIn('"generated_at":', html)
             self.assertIn('id="updatedBadge"', html)
+            self.assertIn('id="claudeAnalyzeBtn"', html)
+            self.assertIn('function openClaudeAnalysis()', html)
+            self.assertIn('https://claude.ai/new', html)
+            self.assertIn('TreasuryFlow_Claude_', html)
 
     def test_protected_html_hides_plain_content_and_password(self) -> None:
         with patch("dashboard_auth.load_users", return_value=[{"username": "TestUser", "password": "Secret123"}]):
