@@ -47,6 +47,9 @@ class TreasuryFlowCoreTests(unittest.TestCase):
             self.assertIn('function openClaudeAnalysis()', html)
             self.assertIn('https://claude.ai/new', html)
             self.assertIn('TreasuryFlow_Claude_', html)
+            self.assertIn('id="treasuryChatBtn"', html)
+            self.assertIn('function context(question)', html)
+            self.assertIn('https://api.groq.com/openai/v1/chat/completions', html)
 
     def test_protected_html_hides_plain_content_and_password(self) -> None:
         with patch("dashboard_auth.load_users", return_value=[{"username": "TestUser", "password": "Secret123"}]):
