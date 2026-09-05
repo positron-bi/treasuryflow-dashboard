@@ -35,6 +35,8 @@ def build_html(data_json: os.PathLike[str] | str, output_html: os.PathLike[str] 
         + (ASSETS / "chartjs.min.js").read_text(encoding="utf-8")
         + "</script>\n<script>"
         + (ASSETS / "main.js").read_text(encoding="utf-8")
+        + "</script>\n<script>"
+        + (ASSETS / "treasury_chat.js").read_text(encoding="utf-8")
         + "</script>\n"
         + (ASSETS / "template_tail.html").read_text(encoding="utf-8")
     )

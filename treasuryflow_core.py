@@ -312,6 +312,18 @@ def _load_html_builder():
 def _protect_html(html: str, users_path: Path) -> str:
     try:
         from dashboard_auth import protect_html
+        # Shared trial key is added only in memory immediately before encryption.
+        # Never put it in source templates, data.json, or the plain HTML build.
+        key = os.environ.get("GROQ_API_KEY", "").strip()
+        if not key and os.name == "nt":
+            import winreg
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as registry:
+                    key = str(winreg.QueryValueEx(registry, "GROQ_API_KEY")[0]).strip()
+            except OSError:
+                pass
+        config = json.dumps({"key": key, "model": "openai/gpt-oss-120b"}).replace("<", "\\u003c")
+        html = html.replace("</head>", "<script>window.TREASURY_AI=" + config + ";</script></head>", 1)
         return protect_html(html, users_path, ACCESS_DASHBOARD, ACCESS_TITLE)
     except (FileNotFoundError, ValueError) as exc:
         raise TreasuryFlowError(str(exc)) from exc
