@@ -498,7 +498,7 @@ function renderW13(){
   options:{maintainAspectRatio:false,plugins:{tooltip:{rtl:true,callbacks:{label:c=>`${c.dataset.label}: ${fa(c.raw)}`}}},
    scales:{y:{ticks:{callback:v=>fa(v)},grid:{color:c=>c.tick.value===0?'#c0392b':'#e3e8ef'}}}}});
  let h='<table><thead><tr><th class="lbl">هفته</th><th>بازه تاریخ</th><th>ورودی</th><th>خروجی</th><th>خالص</th><th>مانده پایان هفته</th></tr></thead><tbody>';
- wins.forEach((w,i)=>{const range=w.range?`${w.range.start} تا ${w.range.end}`:'—';h+=`<tr><td class="lbl">هفته ${fa(i+1)}</td><td class="n small">${range}</td><td class="n">${cell(w.in)}</td><td class="n">${cell(w.out)}</td><td class="n">${cell(w.in+w.out)}</td><td class="n">${cell(closeArr[i])}</td></tr>`;});
+ wins.forEach((w,i)=>{const range=w.range?`<span dir="ltr" style="unicode-bidi:isolate">${w.range.start}</span> تا <span dir="ltr" style="unicode-bidi:isolate">${w.range.end}</span>`:'—';h+=`<tr><td class="lbl">هفته ${fa(i+1)}</td><td class="small">${range}</td><td class="n">${cell(w.in)}</td><td class="n">${cell(w.out)}</td><td class="n">${cell(w.in+w.out)}</td><td class="n">${cell(closeArr[i])}</td></tr>`;});
  document.getElementById('w13Tbl').innerHTML=h+'</tbody></table>';
 }
 
