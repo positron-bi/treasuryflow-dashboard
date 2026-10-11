@@ -20,8 +20,8 @@ build_forecast.py — استخراج و پیش‌بینی جریان نقد گر
 ۲) Manual Inputs/Policy/Capex Register/Credit Lines از یک فایل *جدا* از SRC خوانده
    می‌شوند (mwb ≠ wb) — چون ذخیرهٔ مجدد SRC با openpyxl مقادیر کش‌شدهٔ فرمول‌های
    شیت‌های اصلی (Daily Cashflow و...) را پاک می‌کند. SRC هرگز نباید دوباره save شود.
-۳) ستون‌های مبلغ در Capex Register و Credit Lines به **ریال** هستند (نه میلیون تومان)
-   — باید بر MT تقسیم شوند. ستون «باقی‌مانده» ملاک اثر نقدی کپکس است.
+۳) ستون‌های مبلغ در Capex Register به **ریال** هستند و باید بر MT تقسیم شوند؛
+   ستون‌های مبلغ در Credit Lines به **میلیون تومان** ثبت می‌شوند. ستون «باقی‌مانده» ملاک اثر نقدی کپکس است.
 ۴) دسته‌بندی Manual Inputs: متن دستهٔ فارسی در فایل شامل مقادیری مثل «مالیات» و
    «ارزش افزوده» است که باید به cat داخلی 'tax_ins' نگاشت شوند (نه 'other_out').
    قبلاً این نگاشت ناقص بود و باعث می‌شد مالیات زیر «سایر پرداخت‌ها» برود.
@@ -203,6 +203,20 @@ while fmt(cy, cm, 1) <= HORIZON_END:
     if cm > 12: cm = 1; cy += 1
 
 B = buckets
+
+# بازه‌های ثابت هفت‌روزه برای نمای غلتان ۱۳ هفته. این ساختار از خودِ
+# تاریخ گزارش ساخته می‌شود تا جدول فرانت‌اند به «روز ۰ تا ۶» اکتفا نکند.
+week_ranges = []
+wy, wm, wd = parse(REPORT_DATE)
+for week_no in range(1, 14):
+    start = fmt(wy, wm, wd)
+    ey, em, ed = wy, wm, wd
+    for _ in range(6):
+        ey, em, ed = nextday(ey, em, ed)
+    end = fmt(ey, em, ed)
+    week_ranges.append({'week': week_no, 'start': start, 'end': end})
+    wy, wm, wd = nextday(ey, em, ed)
+
 def bucket_of(ds):
     for i, b in enumerate(B):
         if b['start'] <= ds <= b['end']: return i
@@ -500,14 +514,18 @@ if 'Sales Budget' in mwb.sheetnames:
             if v not in (None, ''):
                 sales_budget[ym][cok] = round(float(v) * 1000, 1)  # میلیارد تومان → میلیون تومان
 
-# ---------------- Credit Lines (ستون‌های مبلغ به ریال) ----------------
+# ---------------- Credit Lines (ستون‌های مبلغ به میلیون تومان) ----------------
 credit_lines = []
 if 'Credit Lines' in mwb.sheetnames:
     for r in mwb['Credit Lines'].iter_rows(min_row=2, values_only=True):
         if r[0] and r[3]:
-            limit_ = float(r[3])/MT; drawn_ = float(r[4])/MT if r[4] not in (None,'') else 0
+            limit_ = float(r[3])
+            drawn_ = float(r[4]) if r[4] not in (None, '') else None
+            available_ = float(r[5]) if r[5] not in (None, '') else (
+                limit_ - drawn_ if drawn_ is not None else None
+            )
             credit_lines.append({'co': co_key(r[0]), 'bank': str(r[1] or ''), 'type': str(r[2] or ''),
-                                  'limit': limit_, 'drawn': drawn_, 'available': limit_-drawn_,
+                                  'limit': limit_, 'drawn': drawn_, 'available': available_,
                                   'maturity': str(r[6] or ''), 'rate': r[7], 'covenant': str(r[8] or ''),
                                   'collateral': str(r[9] or ''), 'owner': str(r[10] or ''), 'notes': str(r[11] or '')})
 
@@ -568,6 +586,7 @@ if snap_files:
 DATA = {
  'report_date': REPORT_DATE, 'version': f'v4.5 | داده تا {REPORT_DATE}',
  'buckets': B, 'companies': [{'key': c, 'fa': CO_FA.get(c, c)} for c in companies],
+ 'week_ranges': week_ranges,
  'cats': [{'id': c[0], 'label': c[1], 'dir': c[2]} for c in CATS],
  'stress_cats': STRESS_CATS,
  'opening': {c: round(opening.get(c,0.0),1) for c in companies},

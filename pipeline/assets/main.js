@@ -479,7 +479,8 @@ function renderChart(C){
 let chW13=null;
 function renderW13(){
  const txs=selTx();
- const wins=[]; for(let w=0;w<13;w++)wins.push({s:w*7,e:w*7+6,in:0,out:0});
+ const ranges=DATA.week_ranges||[];
+ const wins=[]; for(let w=0;w<13;w++)wins.push({range:ranges[w]||null,in:0,out:0});
  txs.forEach(t=>{if(t.doff==null)return; const w=Math.floor(t.doff/7); if(w>=0&&w<13){t.amt>=0?wins[w].in+=t.amt:wins[w].out+=t.amt;}});
  let open=0;for(const co of SEL)open+=DATA.opening[co]||0;
  let bal=open; const closeArr=[];
@@ -496,8 +497,8 @@ function renderW13(){
   {type:'line',label:'مانده پایان هفته',data:closeArr,borderColor:'#2c5f8a',pointRadius:2,borderWidth:2.5,tension:.15}]},
   options:{maintainAspectRatio:false,plugins:{tooltip:{rtl:true,callbacks:{label:c=>`${c.dataset.label}: ${fa(c.raw)}`}}},
    scales:{y:{ticks:{callback:v=>fa(v)},grid:{color:c=>c.tick.value===0?'#c0392b':'#e3e8ef'}}}}});
- let h='<table><thead><tr><th class="lbl">هفته</th><th>بازه</th><th>ورودی</th><th>خروجی</th><th>خالص</th><th>مانده پایان هفته</th></tr></thead><tbody>';
- wins.forEach((w,i)=>{h+=`<tr><td class="lbl">هفته ${fa(i+1)}</td><td class="n small">${'روز '+fa(w.s)+' تا '+fa(w.e)}</td><td class="n">${cell(w.in)}</td><td class="n">${cell(w.out)}</td><td class="n">${cell(w.in+w.out)}</td><td class="n">${cell(closeArr[i])}</td></tr>`;});
+ let h='<table><thead><tr><th class="lbl">هفته</th><th>بازه تاریخ</th><th>ورودی</th><th>خروجی</th><th>خالص</th><th>مانده پایان هفته</th></tr></thead><tbody>';
+ wins.forEach((w,i)=>{const range=w.range?`${w.range.start} تا ${w.range.end}`:'—';h+=`<tr><td class="lbl">هفته ${fa(i+1)}</td><td class="n small">${range}</td><td class="n">${cell(w.in)}</td><td class="n">${cell(w.out)}</td><td class="n">${cell(w.in+w.out)}</td><td class="n">${cell(closeArr[i])}</td></tr>`;});
  document.getElementById('w13Tbl').innerHTML=h+'</tbody></table>';
 }
 
@@ -953,8 +954,10 @@ function renderCredit(){
    <div class="tblwrap"><table><thead><tr><th class="lbl">شرکت</th><th>بانک</th><th>نوع</th><th>سقف مصوب</th><th>برداشت‌شده</th><th>در دسترس</th><th>سررسید/تمدید</th><th>نرخ سود</th><th>وضعیت تعهد</th></tr></thead><tbody>
    <tr><td colspan="9" class="small" style="padding:16px">— در انتظار تکمیل شیت Credit Lines —</td></tr></tbody></table></div>`;
   return;}
- const totLimit=C.reduce((a,p)=>a+p.limit,0), totDrawn=C.reduce((a,p)=>a+p.drawn,0), totAvail=C.reduce((a,p)=>a+p.available,0);
- let h=`<div class="msg">سقف کل ${fa(totLimit)} م.ت — برداشت‌شده ${fa(totDrawn)} م.ت — در دسترس ${fa(totAvail)} م.ت</div>`;
+ const sumKnown=(key)=>C.reduce((a,p)=>a+(Number.isFinite(p[key])?p[key]:0),0);
+ const totLimit=sumKnown('limit'), totDrawn=sumKnown('drawn'), totAvail=sumKnown('available');
+ const allKnown=(key)=>C.every(p=>Number.isFinite(p[key]));
+ let h=`<div class="msg">سقف کل ${fa(totLimit)} م.ت — برداشت‌شده ${allKnown('drawn')?fa(totDrawn):'ثبت نشده'} — در دسترس ${allKnown('available')?fa(totAvail):'ثبت نشده'}</div>`;
  h+='<div class="tblwrap"><table><thead><tr><th class="lbl">شرکت</th><th>بانک</th><th>نوع</th><th>سقف مصوب</th><th>برداشت‌شده</th><th>در دسترس</th><th>سررسید/تمدید</th><th>نرخ سود</th><th>وضعیت تعهد</th></tr></thead><tbody>';
  C.forEach(p=>{h+=`<tr><td class="lbl">${coFa(p.co)}</td><td>${p.bank}</td><td>${p.type}</td><td class="n">${cell(p.limit)}</td><td class="n">${cell(p.drawn)}</td><td class="n">${cell(p.available)}</td><td class="n">${p.maturity||'—'}</td><td class="n">${p.rate!=null?p.rate+'٪':'—'}</td><td><span class="pill ${p.covenant.includes('رعایت')?'g':p.covenant.includes('نقض')?'b':'m'}">${p.covenant||'نامشخص'}</span></td></tr>`;});
  el.innerHTML=h+'</tbody></table></div>';
