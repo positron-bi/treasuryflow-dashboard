@@ -9,7 +9,9 @@ import unittest
 from unittest.mock import patch
 
 from dashboard_auth import protect_html
+from pipeline.cash_accounts import read_cash_accounts
 from pipeline.make_html_v2 import build_html
+from openpyxl import Workbook
 
 from treasuryflow_core import (
     SourceSet,
@@ -23,6 +25,16 @@ from treasuryflow_core import (
 
 
 class TreasuryFlowCoreTests(unittest.TestCase):
+    def test_cash_accounts_follow_headers_after_column_insert(self) -> None:
+        sheet = Workbook().active
+        for index, value in enumerate(["Co.", "Bank - Account", "Account Number", "Bank Balance", "Deposit", "Inserted", "Bank Available", "Deposit"], 1):
+            sheet.cell(5, index, value)
+        for index, value in enumerate(["Pars Anahid", "Bank A", "123", 900, 700, 999999, 200, 333], 1):
+            sheet.cell(6, index, value)
+
+        accounts = read_cash_accounts(sheet, {"Pars Anahid"}, str, 10)
+        self.assertEqual(accounts, [{"co": "Pars Anahid", "bank": "Bank A", "acct": "123", "bal": 20.0, "blocked": 70.0}])
+
     def test_upload_request_lifecycle(self) -> None:
         with TemporaryDirectory() as temp:
             home = Path(temp)

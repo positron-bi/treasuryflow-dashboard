@@ -33,6 +33,7 @@ build_forecast.py — استخراج و پیش‌بینی جریان نقد گر
 import os, re, io, json
 from collections import defaultdict
 import openpyxl
+from pipeline.cash_accounts import read_cash_accounts
 
 # ---------------- تنظیمات اجرا (برای اپ ویندوز از متغیر محیطی دریافت می‌شود) ----------------
 SRC = os.environ.get('TREASURYFLOW_SRC', '/home/claude/decrypted_14050528.xlsx')
@@ -149,20 +150,12 @@ def co_key(name):
     n = str(name).strip()
     return CO_MAP.get(n, n)
 
-# ---------------- Daily Cashflow: موجودی ابتدای دوره هر شرکت ----------------
-# هدر واقعی در ردیف ۴؛ داده از ردیف ۵. ستون ۱۴ = «Available Cash» (مانده قابل برداشت) — همان
-# رقمی که با «نقد در دسترس گروه» در داشبورد جمع می‌شود؛ برای هر شرکت روی همه بانک‌هایش جمع می‌زنیم.
 # ---------------- Daily Cashflow / Cash: موجودی ابتدای دوره و ریز حساب‌ها ----------------
 # منبع درست «نقد در دسترس» ستون Bank Available در شیت Cash است (نه ستون Available Cash
-# در Daily Cashflow که شامل خالص‌سازی وام است و رقم متفاوتی می‌دهد). هر دو (moجودی کل و ریز
+# در Daily Cashflow که شامل خالص‌سازی وام است و رقم متفاوتی می‌دهد). هر دو (موجودی کل و ریز
 # حساب‌ها) از همین یک منبع خوانده می‌شوند تا جمع‌شان همیشه هماهنگ بماند.
-accounts = []
 ws_cash = wb['Cash ']
-for r in ws_cash.iter_rows(min_row=6, max_row=ws_cash.max_row, values_only=True):
-    if r and r[0] and str(r[0]).strip() in VALID_CO_NAMES and isinstance(r[6], (int, float)):
-        accounts.append({'co': co_key(r[0]), 'bank': str(r[1] or '').strip(),
-                          'acct': str(r[2] or ''), 'bal': float(r[6] or 0) / MT,
-                          'blocked': float(r[5] or 0) / MT if isinstance(r[5], (int, float)) else 0})
+accounts = read_cash_accounts(ws_cash, VALID_CO_NAMES, co_key, MT)
 
 opening = defaultdict(float)
 for a in accounts:
